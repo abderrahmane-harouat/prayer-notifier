@@ -105,5 +105,4 @@ app/src/main/res/
 └── font/                    # Yeseva One, Tenor Sans, Raleway, Amiri
 app/src/test/                # unit tests, including the multi-day simulation
 app/src/debug/               # debug-only trigger for test reminders and silences
-archive/                     # the original Flutter version of the app (not maintained)
 ```

@@ -57,6 +57,6 @@ cd prayer-notifier
 
 راجع قسم [Project structure](development.md#project-structure) في النسخة الإنجليزية؛ أسماء الملفات والمجلدات هي نفسها.
 
-باختصار: الشيفرة في `app/src/main/java/com/example/prayernotifier/` (البيانات في `data/`، والحساب في `data/calculation/`، والتذكيرات و«عدم الإزعاج» في `data/notifications/`، واللغة في `i18n/`، والواجهات في `ui/`)، واختبارات الوحدة ومنها محاكاة الأيام الكثيرة في `app/src/test/`، والنصوص العربية في `app/src/main/res/values-ar/`. ومجلد `archive/` يحوي النسخة الأولى من التطبيق بـFlutter (غير مُحدَّثة).
+باختصار: الشيفرة في `app/src/main/java/com/example/prayernotifier/` (البيانات في `data/`، والحساب في `data/calculation/`، والتذكيرات و«عدم الإزعاج» في `data/notifications/`، واللغة في `i18n/`، والواجهات في `ui/`)، واختبارات الوحدة ومنها محاكاة الأيام الكثيرة في `app/src/test/`، والنصوص العربية في `app/src/main/res/values-ar/`.
 
 </div>
