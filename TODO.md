@@ -49,9 +49,9 @@ Goal: the app trusts no one with the user's location, Google included, and works
 
 Do Not Disturb at prayer time and Jumua shipped in 0.2.0. Follow-ups:
 
-- [ ] **Test Do Not Disturb on Samsung One UI**
+- [ ] **Finish testing Do Not Disturb on Samsung One UI**
 
-  Verified on the stock Android 14 emulator: the rule turns on at the adhan and off at the end, survives a restart, leaves the user's own Do Not Disturb alone, keeps a manual "off" during prayer, and is removed when the feature is switched off. Repeat on a Samsung phone (One UI handles Do Not Disturb its own way): install the debug build next to the release app and use the `--ei silence 60` test command from the README.
+  Done on the stock Android 14 emulator: the rule turns on at the adhan and off at the end, survives a restart, leaves the user's own Do Not Disturb alone, keeps a manual "off" during prayer, and is removed when the feature is switched off. Done on a Samsung Galaxy M32 (One UI, Android 13): the rule is created, turns on and off on time, and the user's own Do Not Disturb is kept. Still to check on Samsung: a restart in the middle of a silence, and a real prayer time (not the test command) with the release build.
 
 - [ ] **Let the user choose how long each silence lasts**
 
