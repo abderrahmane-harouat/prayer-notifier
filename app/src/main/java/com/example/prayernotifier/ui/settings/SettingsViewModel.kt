@@ -23,6 +23,8 @@ data class SettingsUiState(
     val loading: Boolean = true,
     val settings: AppSettings = AppSettings(),
     val notificationsAllowed: Boolean = true,
+    /** Do Not Disturb can be switched by the app: Android 10+ with access granted. */
+    val dndAllowed: Boolean = true,
     /** The method "automatic" picks for the current place's country. */
     val automaticMethod: CalculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,
     /** The Asr rule "automatic" picks for the current place's country. */
@@ -78,7 +80,7 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
     }
 
     fun refreshCapabilities(notificationsAllowed: Boolean) {
-        _state.update { it.copy(notificationsAllowed = notificationsAllowed) }
+        _state.update { it.copy(notificationsAllowed = notificationsAllowed, dndAllowed = graph.silencer.available()) }
     }
 
     private fun persist(next: AppSettings) {
@@ -102,6 +104,22 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
         persist(_state.value.settings.copy(asrMethod = asr?.name))
     }
 
+    /** Off ends a silence that is on now and removes the app's rule from Android. */
+    fun setSilenceEnabled(on: Boolean) {
+        val settings = _state.value.settings
+        persist(settings.copy(silence = settings.silence.copy(enabled = on)))
+        if (!on) viewModelScope.launch { withContext(Dispatchers.IO) { graph.turnOffSilence() } }
+    }
+
+    fun setSilenceFor(prayer: String, on: Boolean) {
+        val settings = _state.value.settings
+        persist(settings.copy(silence = settings.silence.with(prayer, on)))
+    }
+
+    fun setPrayerNotifications(prayer: String, next: PrayerNotificationSettings) {
+        persist(_state.value.settings.withPrayerSettings(prayer, next))
+    }
+
     fun setHijriOffset(days: Int) {
         persist(_state.value.settings.copy(hijriDateAdjustment = days.coerceIn(-2, 2)))
     }
@@ -114,9 +132,6 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
     fun adjustmentOf(prayer: String): Int =
         _state.value.settings.timeAdjustments.getAdjustmentForPrayer(prayer)
 
-    fun setPrayerNotifications(prayer: String, next: PrayerNotificationSettings) {
-        persist(_state.value.settings.withPrayerSettings(prayer, next))
-    }
 
     /** Same "remind me X min before" for every prayer; on/off stays per prayer. */
     fun setReminderForAll(minutes: Int) {
@@ -148,6 +163,7 @@ private fun AppSettings.withPrayerSettings(prayer: String, next: PrayerNotificat
         "Asr" -> copy(asrSettings = next)
         "Maghrib" -> copy(maghribSettings = next)
         "Isha" -> copy(ishaSettings = next)
+        PrayerMath.JUMUA -> copy(jumuaSettings = next)
         else -> this
     }
 

@@ -143,7 +143,8 @@ private val ARABIC_NAMES: Map<String, String> = mapOf(
     "Dhuhr" to "الظهر",
     "Asr" to "العصر",
     "Maghrib" to "المغرب",
-    "Isha" to "العشاء"
+    "Isha" to "العشاء",
+    PrayerMath.JUMUA to "الجمعة"
 )
 
 /** Room the floating header needs above the scrolling content. */
@@ -273,13 +274,15 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
     // First run: ask for notifications (Android 13+) once the location step
     // is settled (times on screen, or an error the user can read), never on
     // top of a location dialog. Asked once; later the Settings banner offers it.
+    var notificationDialogOpen by remember { mutableStateOf(false) }
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { }
+    ) { notificationDialogOpen = false }
     val locationStepSettled = !state.loading && !state.askForPermission && !locationDialogOpen &&
         (state.days.isNotEmpty() || state.error != null)
     LaunchedEffect(locationStepSettled) {
         if (locationStepSettled && shouldAskNotificationsOnce(context)) {
+            notificationDialogOpen = true
             notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -314,6 +317,17 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
                 else -> Unit
             }
         }
+    }
+
+    // Once, after the first-run dialogs: Do Not Disturb at prayer is on by
+    // default, but Android grants the access only in its own settings.
+    val dndMessage = stringResource(R.string.notice_dnd_access)
+    val dndAction = stringResource(R.string.allow)
+    LaunchedEffect(locationStepSettled, notificationDialogOpen, state.settings.silence.enabled) {
+        val ready = locationStepSettled && !notificationDialogOpen && state.settings.silence.enabled
+        if (!ready || !shouldOfferDndAccessOnce(context, graph.silencer.available())) return@LaunchedEffect
+        val answer = snackbar.showSnackbar(dndMessage, dndAction, duration = SnackbarDuration.Long)
+        if (answer == SnackbarResult.ActionPerformed) openDndAccessSettings(context)
     }
 
     val today = LocalDate.now()
@@ -539,7 +553,7 @@ private fun HomeContent(
                 Hero(
                     prayer = heroPrayer,
                     title = if (countdown != null) {
-                        stringResource(prayerNameRes(countdown.nextPrayer))
+                        stringResource(prayerNameRes(PrayerMath.prayerOn(countdown.nextPrayer, state.selectedDate)))
                     } else {
                         state.selectedDate.dayOfWeek.getDisplayName(JavaTextStyle.FULL, locale)
                     },
@@ -569,14 +583,16 @@ private fun HomeContent(
                 val nextIndex = nextToday?.let { PrayerMath.ORDER.indexOf(it) }
                 val index = PrayerMath.ORDER.indexOf(prayer)
                 val isPast = isToday && (nextIndex == null || index < nextIndex)
+                // Jumua on Fridays: its name and its own reminder, at Dhuhr's time.
+                val shown = PrayerMath.prayerOn(prayer, state.selectedDate)
                 PrayerEventCard(
-                    prayer = prayer,
-                    subtitle = if (isArabic) prayer else ARABIC_NAMES[prayer].orEmpty(),
+                    prayer = shown,
+                    subtitle = if (isArabic) shown else ARABIC_NAMES[shown].orEmpty(),
                     time = PrayerMath.adjustTime(
                         PrayerMath.timeOf(day.timings, prayer),
                         adjustments.getAdjustmentForPrayer(prayer)
                     ),
-                    reminder = state.settings.getSettingsForPrayer(prayer),
+                    reminder = state.settings.getSettingsForPrayer(shown),
                     isNext = prayer == nextToday,
                     isPast = isPast
                 )
@@ -954,6 +970,24 @@ private fun shouldAskNotificationsOnce(context: Context): Boolean {
 }
 
 private const val NOTIF_ASKED_ON_START = "notifications_asked_on_start"
+
+/** True exactly once per install, on Android 10+, while Do Not Disturb access is missing. */
+private fun shouldOfferDndAccessOnce(context: Context, accessGranted: Boolean): Boolean {
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q || accessGranted) return false
+    val prefs = context.getSharedPreferences(PERM_PREFS, Context.MODE_PRIVATE)
+    if (prefs.getBoolean(DND_OFFERED, false)) return false
+    prefs.edit().putBoolean(DND_OFFERED, true).apply()
+    return true
+}
+
+private const val DND_OFFERED = "dnd_access_offered"
+
+/** Android's "Do Not Disturb access" list, where the app can be allowed. */
+private fun openDndAccessSettings(context: Context) {
+    context.startActivity(
+        Intent(SystemSettings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    )
+}
 
 private fun hasLocationPermission(context: Context): Boolean {
     val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)

@@ -3,6 +3,7 @@ package com.example.prayernotifier.data.notifications
 import com.example.prayernotifier.data.PrayerMath
 import com.example.prayernotifier.data.PrayerTimings
 import com.example.prayernotifier.data.persistence.AppSettings
+import com.example.prayernotifier.data.persistence.SilenceSettings
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -18,11 +19,25 @@ data class PlannedNotification(
     val leadMinutes: Int = 0
 )
 
-data class DayPlan(val planned: List<PlannedNotification>, val skippedPast: Int)
+/** Do Not Disturb for one prayer: on at the adhan, off at [endAt]. */
+data class PlannedSilence(
+    val prayer: String,
+    val startAt: ZonedDateTime,
+    val endAt: ZonedDateTime
+)
+
+data class DayPlan(
+    val planned: List<PlannedNotification>,
+    val skippedPast: Int,
+    val silences: List<PlannedSilence> = emptyList()
+)
 
 /**
  * Pure scheduling math: per-prayer enable flags + "remind me X minutes
  * before" → exact fire moments. Past moments are skipped and counted.
+ * On Fridays Dhuhr is planned as Jumua, with Jumua's reminder and silence.
+ * Silences start at the adhan; one whose adhan has passed is not started
+ * late, so re-planning mid-prayer never turns Do Not Disturb back on.
  */
 object FireTimePlanner {
     private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
@@ -34,23 +49,28 @@ object FireTimePlanner {
         now: ZonedDateTime
     ): DayPlan {
         val planned = mutableListOf<PlannedNotification>()
+        val silences = mutableListOf<PlannedSilence>()
         var skipped = 0
         for (prayer in PrayerMath.ORDER) {
-            val prayerSettings = settings.getSettingsForPrayer(prayer)
-            if (!prayerSettings.enabled) continue
+            val shown = PrayerMath.prayerOn(prayer, date)
             val at = PrayerMath
                 .dateTimeFor(timings, settings.timeAdjustments, prayer, date)
                 .atZone(now.zone)
+            if (settings.silence.isOnFor(shown) && at.isAfter(now)) {
+                silences += PlannedSilence(shown, at, at.plusMinutes(SilenceSettings.minutesFor(shown).toLong()))
+            }
+            val prayerSettings = settings.getSettingsForPrayer(shown)
+            if (!prayerSettings.enabled) continue
             val fireAt = at.minusMinutes(prayerSettings.prePrayerReminderMinutes.toLong())
             if (!fireAt.isAfter(now)) {
                 skipped++
                 continue
             }
             planned += PlannedNotification(
-                prayer, fireAt, at.format(TIME_FORMAT), prayerSettings.prePrayerReminderMinutes
+                shown, fireAt, at.format(TIME_FORMAT), prayerSettings.prePrayerReminderMinutes
             )
         }
-        return DayPlan(planned, skipped)
+        return DayPlan(planned, skipped, silences)
     }
 
     /** Daily re-plan moment: 00:01 the next day, so tomorrow is always covered. */

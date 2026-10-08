@@ -47,18 +47,28 @@ Goal: the app trusts no one with the user's location, Google included, and works
 
 ## Planned
 
-- [ ] **Silence the phone during prayer (Do Not Disturb)**
+Do Not Disturb at prayer time and Jumua shipped in 0.2.0. Follow-ups:
 
-  When a prayer time arrives, turn on Do Not Disturb for a few minutes, then turn it back off automatically.
+- [ ] **Test Do Not Disturb on Samsung One UI**
 
-  Ideas for the behaviour:
-  - A switch per prayer (like reminders), plus a duration: 10, 15, 20 or 30 minutes.
-  - Starts at the prayer time itself (not at the earlier reminder), using the same exact scheduling as reminders.
-  - Ends on its own; if the user changes Do Not Disturb manually in between, leave their choice alone.
-  - Optional: let the prayer reminder itself still be heard (priority exception).
+  Verified on the stock Android 14 emulator: the rule turns on at the adhan and off at the end, survives a restart, leaves the user's own Do Not Disturb alone, keeps a manual "off" during prayer, and is removed when the feature is switched off. Repeat on a Samsung phone (One UI handles Do Not Disturb its own way): install the debug build next to the release app and use the `--ei silence 60` test command from the README.
 
-  Technical notes:
-  - Needs Do Not Disturb access (`ACCESS_NOTIFICATION_POLICY`). Android grants it **only from a system Settings screen**, never from an in-app dialog, so the app has to open "Do Not Disturb access" once, with a short explanation first. This is the one case where sending the user to Settings can't be avoided.
-  - Prefer `AutomaticZenRule` (a named "Prayer time" mode the user can see and edit in system settings, and Android 15's Modes) over flipping `setInterruptionFilter` directly, so it's clear which app silenced the phone.
-  - Schedule a "start" and an "end" alarm per prayer, re-planned nightly and after reboot like reminders; if the end alarm is missed (phone off), clear the rule on the next launch.
-  - Test on Samsung One UI as well as stock Android: Do Not Disturb behaves differently there.
+- [ ] **Let the user choose how long each silence lasts**
+
+  Fixed today at 35 minutes for Fajr, 1 hour for Jumua and 15 minutes for the others (`SilenceSettings.minutesFor`). A duration per prayer in the Do Not Disturb card (for example 10 to 60 minutes) would fit mosques with longer prayers.
+
+- [ ] **A time correction for Jumua**
+
+  Jumua uses Dhuhr's time and correction. Many mosques start the sermon later than Dhuhr; a separate Jumua correction would move its reminder and silence without touching Dhuhr on other days.
+
+- [ ] **Show the night's late Isha after midnight on Home**
+
+  Far north in summer, Isha can fall after midnight. Reminders and Do Not Disturb handle it (tested in `MultiDaySimulationTest`), but after midnight Home shows the new day's list and counts down to Fajr, not to the previous night's Isha still ahead.
+
+- [ ] **Reminders inside another prayer's silence**
+
+  Where prayers are close together (Oslo in winter: Asr less than an hour after Dhuhr), Jumua's hour of silence can cover the Asr reminder, which then arrives without sound. Consider ending a silence a little before the next prayer's reminder, or letting the app's own reminders through.
+
+- [ ] **Do Not Disturb on Android 8 and 9**
+
+  The feature needs Android 10 (the app's own automatic rule). Older phones could use `setInterruptionFilter` with care not to undo the user's own Do Not Disturb; they are a small share today.

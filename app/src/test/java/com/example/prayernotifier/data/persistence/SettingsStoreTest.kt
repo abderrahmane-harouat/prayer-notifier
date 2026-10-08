@@ -50,4 +50,24 @@ class SettingsStoreTest {
         assertEquals(10, loaded.travelTimeSettings.getTravelTimeForPrayer("Fajr"))
         assertEquals(0, loaded.timeAdjustments.getAdjustmentForPrayer("Isha"))
     }
+
+    @Test
+    fun `settings saved before 0_2 get Do Not Disturb on and Jumua 30 minutes before`() = runTest {
+        // What 0.1 stored: no silence, no Jumua.
+        store.put(SettingsStore.KEY, """{"fajrSettings":{"prePrayerReminderMinutes":10},"hijriDateAdjustment":1}""")
+        val loaded = settings.load()
+        assertEquals(10, loaded.fajrSettings.prePrayerReminderMinutes)
+        assertEquals(1, loaded.hijriDateAdjustment)
+        assertEquals(SilenceSettings(), loaded.silence)
+        assertEquals(true, loaded.silence.isOnFor("Fajr"))
+        assertEquals(30, loaded.jumuaSettings.prePrayerReminderMinutes)
+        assertEquals(loaded.jumuaSettings, loaded.getSettingsForPrayer("Jumua"))
+    }
+
+    @Test
+    fun `silence lasts 35 min after Fajr, an hour after Jumua, 15 after the others`() {
+        assertEquals(35, SilenceSettings.minutesFor("Fajr"))
+        assertEquals(60, SilenceSettings.minutesFor("Jumua"))
+        listOf("Dhuhr", "Asr", "Maghrib", "Isha").forEach { assertEquals(15, SilenceSettings.minutesFor(it)) }
+    }
 }

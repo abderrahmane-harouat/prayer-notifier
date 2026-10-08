@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Do Not Disturb at prayer time. Android grants it only from its own
+         settings screen ("Do Not Disturb access"), never from a dialog. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <!-- Exact timing for on-time prayer notifications, granted without any
          prompt: USE_EXACT_ALARM on Android 13+, SCHEDULE_EXACT_ALARM (granted
          by default) on 12/12L. The user never sees an "Alarms & reminders"
@@ -38,6 +41,8 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="com.example.prayernotifier.ACTION_PRAYER_ALARM" />
                 <action android:name="com.example.prayernotifier.ACTION_REPLENISH" />
+                <action android:name="com.example.prayernotifier.ACTION_SILENCE_START" />
+                <action android:name="com.example.prayernotifier.ACTION_SILENCE_END" />
             </intent-filter>
         </receiver>
     </application>

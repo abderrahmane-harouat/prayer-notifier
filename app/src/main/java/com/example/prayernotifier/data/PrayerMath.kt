@@ -1,9 +1,11 @@
 package com.example.prayernotifier.data
 
 import com.example.prayernotifier.data.persistence.PrayerTimeAdjustments
+import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.util.Locale
 
 data class Countdown(val nextPrayer: String, val remaining: Duration)
@@ -21,6 +23,13 @@ object PrayerMath {
 
     val ORDER = listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha")
 
+    /** Friday's prayer at Dhuhr time, with its own reminder and silence. */
+    const val JUMUA = "Jumua"
+
+    /** The prayer as it is on that date: Dhuhr is Jumua on Fridays. */
+    fun prayerOn(prayer: String, date: LocalDate): String =
+        if (prayer == "Dhuhr" && date.dayOfWeek == DayOfWeek.FRIDAY) JUMUA else prayer
+
     /**
      * Shifts a "HH:mm" time by minutes, wrapping around midnight. Always
      * Western digits, like the calculated times, whatever the language.
@@ -33,28 +42,40 @@ object PrayerMath {
         return String.format(Locale.ROOT, "%02d:%02d", wrapped / 60, wrapped % 60)
     }
 
-    /** One prayer's "HH:mm" time, before any correction. */
+    /** One prayer's "HH:mm" time, before any correction. Jumua is at Dhuhr's. */
     fun timeOf(timings: PrayerTimings, prayer: String): String = when (prayer) {
         "Fajr" -> timings.fajr
-        "Dhuhr" -> timings.dhuhr
+        "Dhuhr", JUMUA -> timings.dhuhr
         "Asr" -> timings.asr
         "Maghrib" -> timings.maghrib
         "Isha" -> timings.isha
         else -> error("Unknown prayer: $prayer")
     }
 
-    /** Adjusted date-time of one prayer on a given date. */
+    /**
+     * Adjusted date-time of one prayer of a given date. Far north in summer,
+     * Isha (even Maghrib) can fall after midnight: an evening time earlier
+     * than Dhuhr is on the next calendar day, and a Fajr later than Dhuhr on
+     * the one before. A correction that crosses midnight moves the date too.
+     */
     fun dateTimeFor(
         timings: PrayerTimings,
         adjustments: PrayerTimeAdjustments,
         prayer: String,
         date: LocalDate
     ): LocalDateTime {
-        val base = timeOf(timings, prayer)
-        val shifted = adjustTime(base, adjustments.getAdjustmentForPrayer(prayer))
-        val (hour, minute) = shifted.split(":").map { it.toInt() }
-        return date.atTime(hour, minute)
+        val base = LocalTime.parse(timeOf(timings, prayer))
+        val dhuhr = LocalTime.parse(timings.dhuhr)
+        val dayOffset = when {
+            prayer in EVENING && base.isBefore(dhuhr) -> 1L
+            prayer == "Fajr" && base.isAfter(dhuhr) -> -1L
+            else -> 0L
+        }
+        return date.plusDays(dayOffset).atTime(base)
+            .plusMinutes(adjustments.getAdjustmentForPrayer(prayer).toLong())
     }
+
+    private val EVENING = setOf("Maghrib", "Isha")
 
     /** First prayer strictly after `now`, or null when today's are all past. */
     fun nextPrayer(

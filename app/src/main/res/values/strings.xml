@@ -7,6 +7,7 @@
     <string name="prayer_asr">Asr</string>
     <string name="prayer_maghrib">Maghrib</string>
     <string name="prayer_isha">Isha</string>
+    <string name="prayer_jumua">Jumua</string>
 
     <!-- Hijri months, in order from Muharram. -->
     <string-array name="hijri_months">
@@ -159,6 +160,25 @@
     <string name="method_singapore">Singapore</string>
     <string name="method_malaysia">Malaysia (JAKIM)</string>
     <string name="method_indonesia">Indonesia (Kemenag)</string>
+
+    <!-- Settings: Friday prayer and Do Not Disturb -->
+    <string name="section_jumua">Friday prayer</string>
+    <string name="jumua_note">Jumua takes Dhuhr\'s place on Fridays, at Dhuhr\'s time and with its correction.</string>
+    <string name="section_dnd">Do Not Disturb</string>
+    <string name="dnd_title">Silence the phone at prayer</string>
+    <string name="dnd_desc">Do Not Disturb turns on at the adhan and off by itself afterwards. Alarms and repeat callers still get through.</string>
+    <string name="dnd_needs_android10">Needs Android 10 or later.</string>
+    <string name="dnd_access_title">Do Not Disturb access is off</string>
+    <string name="dnd_access_desc">Android allows it only from its settings: find Prayer Notifier in the list and turn it on.</string>
+    <plurals name="dnd_for_minutes">
+        <item quantity="one">Silent for %1$s min</item>
+        <item quantity="other">Silent for %1$s min</item>
+    </plurals>
+    <string name="dnd_for_hour">Silent for 1 hour</string>
+    <string name="cd_dnd_prayer">Do Not Disturb at %1$s</string>
+    <string name="dnd_rule_name">Prayer time</string>
+    <string name="notice_dnd_access">Allow Do Not Disturb access to silence the phone at prayer time.</string>
+    <string name="allow">Allow</string>
 
     <string name="app_language">App language</string>
     <string name="language_system">System default</string>

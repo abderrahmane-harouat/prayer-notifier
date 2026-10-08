@@ -27,13 +27,15 @@ class AppGraph(context: Context) {
         )
     }
     private val prayerTimes by lazy { PrayerTimesRepository(deviceCountry = region::countryCode) }
-    private val settings by lazy { SettingsStore(PrefsKeyValueStore(app, "prayer_notifier_settings")) }
+    private val settingsPrefs by lazy { PrefsKeyValueStore(app, "prayer_notifier_settings") }
+    private val settings by lazy { SettingsStore(settingsPrefs) }
     private val scheduler by lazy { ExactAlarmScheduler(app, RealAlarmOps(app)) }
     private val notifier by lazy { SystemNotifier(app) }
 
     val handler by lazy {
         PrayerAlarmHandler(
             locationService, prayerTimes, settings, scheduler, notifier,
+            DoNotDisturbSilencer(app), SilenceState(settingsPrefs),
             texts = LocalizedNotificationTexts(app)
         )
     }

@@ -6,6 +6,7 @@
     <string name="prayer_asr">العصر</string>
     <string name="prayer_maghrib">المغرب</string>
     <string name="prayer_isha">العشاء</string>
+    <string name="prayer_jumua">الجمعة</string>
 
     <string-array name="hijri_months">
         <item>محرّم</item>
@@ -170,6 +171,29 @@
     <string name="method_singapore">سنغافورة</string>
     <string name="method_malaysia">ماليزيا (جاكيم)</string>
     <string name="method_indonesia">إندونيسيا (كيميناغ)</string>
+
+    <!-- Settings: Friday prayer and Do Not Disturb -->
+    <string name="section_jumua">صلاة الجمعة</string>
+    <string name="jumua_note">تحلّ الجمعة محلّ الظهر يوم الجمعة، في وقت الظهر وبتعديله.</string>
+    <string name="section_dnd">عدم الإزعاج</string>
+    <string name="dnd_title">إسكات الهاتف وقت الصلاة</string>
+    <string name="dnd_desc">يُفعَّل «عدم الإزعاج» عند الأذان ويتوقف تلقائيًا بعده. وتبقى المنبّهات والمكالمات المتكرّرة تصل.</string>
+    <string name="dnd_needs_android10">يتطلب أندرويد 10 أو أحدث.</string>
+    <string name="dnd_access_title">إذن «عدم الإزعاج» غير مفعّل</string>
+    <string name="dnd_access_desc">لا يسمح به أندرويد إلا من إعداداته: ابحث عن منبّه الصلاة في القائمة وفعّله.</string>
+    <plurals name="dnd_for_minutes">
+        <item quantity="zero">صامت %1$s دقيقة</item>
+        <item quantity="one">صامت %1$s دقيقة</item>
+        <item quantity="two">صامت %1$s دقيقتين</item>
+        <item quantity="few">صامت %1$s دقائق</item>
+        <item quantity="many">صامت %1$s دقيقة</item>
+        <item quantity="other">صامت %1$s دقيقة</item>
+    </plurals>
+    <string name="dnd_for_hour">صامت ساعة واحدة</string>
+    <string name="cd_dnd_prayer">عدم الإزعاج في %1$s</string>
+    <string name="dnd_rule_name">وقت الصلاة</string>
+    <string name="notice_dnd_access">اسمح بإذن «عدم الإزعاج» لإسكات الهاتف وقت الصلاة.</string>
+    <string name="allow">السماح</string>
 
     <string name="app_language">لغة التطبيق</string>
     <string name="language_system">لغة النظام</string>

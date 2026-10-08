@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.prayernotifier.data.PrayerTimings
 import com.example.prayernotifier.data.persistence.AppSettings
 import com.example.prayernotifier.data.persistence.PrayerNotificationSettings
+import com.example.prayernotifier.data.persistence.SilenceSettings
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.Month
@@ -32,6 +33,9 @@ class ExactAlarmSchedulerTest {
         maghrib = "18:52", isha = "20:20"
     )
 
+    /** Reminders alone; Do Not Disturb has its own tests below. */
+    private val remindersOnly = AppSettings(silence = SilenceSettings(enabled = false))
+
     private lateinit var ops: RecordingAlarmOps
     private lateinit var scheduler: ExactAlarmScheduler
 
@@ -51,7 +55,7 @@ class ExactAlarmSchedulerTest {
             .toInstant().toEpochMilli()
 
     @Test fun `schedules exact RTC alarms at precise moments plus replenish`() {
-        val report = scheduler.scheduleDay(date, timings, AppSettings(), at(4, 0))
+        val report = scheduler.scheduleDay(date, timings, remindersOnly, at(4, 0))
 
         assertEquals(5, report.scheduled)
         assertEquals(0, report.skippedPast)
@@ -70,14 +74,14 @@ class ExactAlarmSchedulerTest {
     }
 
     @Test fun `past prayers are reported as skipped`() {
-        val report = scheduler.scheduleDay(date, timings, AppSettings(), at(13, 0))
+        val report = scheduler.scheduleDay(date, timings, remindersOnly, at(13, 0))
         assertEquals(3, report.scheduled)
         assertEquals(2, report.skippedPast)
         assertEquals(4, ops.sets.size) // 3 prayers + replenish.
     }
 
     @Test fun `disabled prayer gets no alarm`() {
-        val settings = AppSettings(ishaSettings = PrayerNotificationSettings(enabled = false))
+        val settings = remindersOnly.copy(ishaSettings = PrayerNotificationSettings(enabled = false))
         val report = scheduler.scheduleDay(date, timings, settings, at(4, 0))
         assertEquals(4, report.scheduled)
         // 4 prayers + replenish:
@@ -85,21 +89,43 @@ class ExactAlarmSchedulerTest {
     }
 
     @Test fun `reschedule cancels previous alarms first`() {
-        scheduler.scheduleDay(date, timings, AppSettings(), at(4, 0))
-        assertEquals(6, ops.cancels) // scheduleDay always clears before setting.
+        scheduler.scheduleDay(date, timings, remindersOnly, at(4, 0))
+        assertEquals(21, ops.cancels) // scheduleDay always clears before setting.
         assertEquals(6, ops.sets.size)
-        scheduler.scheduleDay(date, timings, AppSettings(), at(4, 0))
-        assertEquals(12, ops.cancels)
+        scheduler.scheduleDay(date, timings, remindersOnly, at(4, 0))
+        assertEquals(42, ops.cancels)
         assertEquals(12, ops.sets.size)
     }
 
-    @Test fun `cancelAll removes everything`() {
+    @Test fun `cancelAll removes reminders, silence starts and the re-plan`() {
         scheduler.cancelAll()
-        assertEquals(6, ops.cancels)
+        // Reminders and silence starts for both day parities, and the re-plan.
+        assertEquals(21, ops.cancels)
+    }
+
+    @Test fun `silence starts at each adhan by default`() {
+        scheduler.scheduleDay(date, timings, AppSettings(), at(4, 0))
+        val starts = listOf(millis(5, 12), millis(12, 45), millis(16, 10), millis(18, 52), millis(20, 20))
+        assertEquals(11, ops.sets.size) // 5 reminders + 5 silence starts + replenish.
+        assertTrue(ops.sets.map { it.second }.containsAll(starts))
+    }
+
+    @Test fun `an on-time reminder and its silence share one alarm, reminder first`() {
+        val settings = AppSettings(fajrSettings = PrayerNotificationSettings(prePrayerReminderMinutes = 0))
+        scheduler.scheduleDay(date, timings, settings, at(4, 0))
+        assertEquals(10, ops.sets.size)
+        assertEquals(1, ops.sets.count { it.second == millis(5, 12) })
+    }
+
+    @Test fun `silence end is its own alarm, outside day plans`() {
+        scheduler.scheduleSilenceEnd(millis(21, 0))
+        assertEquals(listOf(AlarmManager.RTC_WAKEUP to millis(21, 0)), ops.sets)
+        scheduler.cancelSilenceEnd()
+        assertEquals(1, ops.cancels)
     }
 
     @Test fun `alarms fire to the minute, not rounded or shifted`() {
-        scheduler.scheduleDay(date, timings, AppSettings(), at(4, 0))
+        scheduler.scheduleDay(date, timings, remindersOnly, at(4, 0))
         val fajrMillis = ops.sets[0].second
         // Exactly 05:07:00.000 — no seconds drift, no inexact window.
         assertEquals(millis(5, 7), fajrMillis)
@@ -110,7 +136,7 @@ class ExactAlarmSchedulerTest {
         val denied = ExactAlarmScheduler(
             ApplicationProvider.getApplicationContext(), ops, canScheduleExactAlarms = { false }
         )
-        val report = denied.scheduleDay(date, timings, AppSettings(), at(4, 0))
+        val report = denied.scheduleDay(date, timings, remindersOnly, at(4, 0))
         assertEquals(5, report.scheduled)
         assertTrue(report.exactAlarmDenied)
         assertTrue(ops.sets.isEmpty())

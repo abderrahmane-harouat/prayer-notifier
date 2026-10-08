@@ -2,13 +2,15 @@ package com.example.prayernotifier.i18n
 
 import androidx.annotation.StringRes
 import com.example.prayernotifier.R
+import com.example.prayernotifier.data.PrayerMath
 import com.example.prayernotifier.data.calculation.CalculationMethod
 
-/** Display-name resource for a prayer id ("Fajr" … "Isha"). */
+/** Display-name resource for a prayer id ("Fajr" … "Isha", or "Jumua"). */
 @StringRes
 fun prayerNameRes(prayer: String): Int = when (prayer) {
     "Fajr" -> R.string.prayer_fajr
     "Dhuhr" -> R.string.prayer_dhuhr
+    PrayerMath.JUMUA -> R.string.prayer_jumua
     "Asr" -> R.string.prayer_asr
     "Maghrib" -> R.string.prayer_maghrib
     else -> R.string.prayer_isha

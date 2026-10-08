@@ -81,6 +81,7 @@ import com.example.prayernotifier.data.calculation.AsrMethod
 import com.example.prayernotifier.data.calculation.CalculationMethod
 import com.example.prayernotifier.data.persistence.AppSettings
 import com.example.prayernotifier.data.persistence.PrayerNotificationSettings
+import com.example.prayernotifier.data.persistence.SilenceSettings
 import com.example.prayernotifier.i18n.AppLanguage
 import com.example.prayernotifier.i18n.methodNameRes
 import com.example.prayernotifier.i18n.prayerNameRes
@@ -194,7 +195,12 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                 // without a prompt, and falls back to inexact if revoked.
                 if (!state.notificationsAllowed) {
                     item {
-                        PermissionBanner(onEnable = { requestSystemAuthorization() })
+                        PermissionBanner(
+                            title = stringResource(R.string.notifications_off),
+                            body = stringResource(R.string.permission_needed),
+                            action = stringResource(R.string.enable),
+                            onClick = { requestSystemAuthorization() }
+                        )
                     }
                 }
 
@@ -224,6 +230,43 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                             if (index < vm.prayerNames().lastIndex) WonderDivider()
                         }
                     }
+                }
+
+                item {
+                    SectionEyebrow(stringResource(R.string.section_jumua))
+                    WonderCard {
+                        PrayerRow(
+                            prayer = PrayerMath.JUMUA,
+                            reminder = state.settings.jumuaSettings,
+                            adjustment = 0,
+                            onOpen = { sheet = Sheet.Prayer(PrayerMath.JUMUA) },
+                            onToggle = { on ->
+                                vm.setPrayerNotifications(
+                                    PrayerMath.JUMUA, state.settings.jumuaSettings.copy(enabled = on)
+                                )
+                                if (on) ensureNotificationsAllowed()
+                            }
+                        )
+                    }
+                }
+
+                item {
+                    SectionEyebrow(stringResource(R.string.section_dnd))
+                    // Granted only from Android's own settings screen, never a dialog.
+                    if (DND_SUPPORTED && state.settings.silence.enabled && !state.dndAllowed) {
+                        PermissionBanner(
+                            title = stringResource(R.string.dnd_access_title),
+                            body = stringResource(R.string.dnd_access_desc),
+                            action = stringResource(R.string.allow),
+                            onClick = { openDndAccessSettings(context) }
+                        )
+                        Spacer(Modifier.height(WonderSpacing.x16))
+                    }
+                    SilenceCard(
+                        silence = state.settings.silence,
+                        onToggle = { vm.setSilenceEnabled(it) },
+                        onTogglePrayer = { prayer, on -> vm.setSilenceFor(prayer, on) }
+                    )
                 }
 
                 item {
@@ -432,9 +475,9 @@ private fun wonderSwitchColors() = SwitchDefaults.colors(
 
 /** Accent-ruled callout, like Wonderous' pull quote: 1dp orange rule at left. */
 @Composable
-private fun PermissionBanner(onEnable: () -> Unit) {
+private fun PermissionBanner(title: String, body: String, action: String, onClick: () -> Unit) {
     Surface(
-        onClick = onEnable,
+        onClick = onClick,
         shape = RoundedCornerShape(WonderCorners.card),
         color = WonderGreyStrong
     ) {
@@ -453,19 +496,19 @@ private fun PermissionBanner(onEnable: () -> Unit) {
             Spacer(Modifier.width(WonderSpacing.x16))
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.notifications_off),
+                    text = title,
                     style = MaterialTheme.typography.titleMedium.copy(fontStyle = FontStyle.Italic),
                     color = WonderOffWhite
                 )
                 Text(
-                    text = stringResource(R.string.permission_needed),
+                    text = body,
                     style = MaterialTheme.typography.bodySmall,
                     color = WonderAccent2
                 )
             }
             Spacer(Modifier.width(WonderSpacing.x12))
             Text(
-                text = stringResource(R.string.enable).uppercase(),
+                text = action.uppercase(),
                 style = MaterialTheme.typography.labelLarge,
                 color = WonderAccent1,
                 modifier = Modifier.padding(WonderSpacing.x8)
@@ -476,6 +519,92 @@ private fun PermissionBanner(onEnable: () -> Unit) {
 
 /** Choices offered wherever a reminder lead time is picked. */
 private val REMINDER_CHOICES = listOf(0, 5, 10, 15, 30)
+
+/** Jumua's: people leave earlier for the sermon. */
+private val JUMUA_REMINDER_CHOICES = listOf(0, 15, 30, 45, 60)
+
+/** Do Not Disturb rules the app can switch on and off need Android 10. */
+private val DND_SUPPORTED = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+
+/**
+ * The master switch, then one switch per prayer with how long the phone
+ * stays silent (Fajr 35 min, Jumua 1 hour, the others 15 min).
+ */
+@Composable
+private fun SilenceCard(
+    silence: SilenceSettings,
+    onToggle: (Boolean) -> Unit,
+    onTogglePrayer: (String, Boolean) -> Unit
+) {
+    WonderCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = DND_SUPPORTED, role = Role.Switch) { onToggle(!silence.enabled) }
+                .padding(horizontal = WonderSpacing.x24, vertical = WonderSpacing.x16),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.dnd_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = WonderOffWhite
+                )
+                Spacer(Modifier.height(WonderSpacing.x4))
+                Text(
+                    text = stringResource(if (DND_SUPPORTED) R.string.dnd_desc else R.string.dnd_needs_android10),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = WonderAccent2
+                )
+            }
+            Spacer(Modifier.width(WonderSpacing.x12))
+            Switch(
+                checked = DND_SUPPORTED && silence.enabled,
+                onCheckedChange = onToggle,
+                enabled = DND_SUPPORTED,
+                colors = wonderSwitchColors()
+            )
+        }
+        if (DND_SUPPORTED && silence.enabled) {
+            (PrayerMath.ORDER + PrayerMath.JUMUA).forEach { prayer ->
+                WonderDivider()
+                SilenceRow(
+                    prayer = prayer,
+                    on = silence.isOnFor(prayer),
+                    onToggle = { onTogglePrayer(prayer, it) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SilenceRow(prayer: String, on: Boolean, onToggle: (Boolean) -> Unit) {
+    val name = stringResource(prayerNameRes(prayer))
+    val minutes = SilenceSettings.minutesFor(prayer)
+    val description = stringResource(R.string.cd_dnd_prayer, name)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Switch, onClickLabel = description) { onToggle(!on) }
+            .padding(horizontal = WonderSpacing.x24, vertical = WonderSpacing.x12),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(text = name, style = MaterialTheme.typography.titleMedium, color = WonderOffWhite)
+            Text(
+                text = if (minutes % 60 == 0) {
+                    stringResource(R.string.dnd_for_hour)
+                } else {
+                    pluralStringResource(R.plurals.dnd_for_minutes, minutes, minutes.toString())
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (on) WonderAccent2 else WonderCaption
+            )
+        }
+        Switch(checked = on, onCheckedChange = onToggle, colors = wonderSwitchColors())
+    }
+}
 
 @Composable
 private fun reminderChoiceLabel(minutes: Int): String =
@@ -779,7 +908,8 @@ private fun PrayerSheet(
     var enabled by remember(reminder) { mutableStateOf(reminder.enabled) }
     var minutes by remember(reminder) { mutableIntStateOf(reminder.prePrayerReminderMinutes) }
     var shift by remember(adjustment) { mutableIntStateOf(adjustment) }
-    val choices = (REMINDER_CHOICES + minutes).distinct().sorted()
+    val isJumua = prayer == PrayerMath.JUMUA
+    val choices = ((if (isJumua) JUMUA_REMINDER_CHOICES else REMINDER_CHOICES) + minutes).distinct().sorted()
     SheetColumn(title = stringResource(prayerNameRes(prayer))) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -809,47 +939,56 @@ private fun PrayerSheet(
             }
         }
 
-        Spacer(Modifier.height(WonderSpacing.x24))
-        Text(
-            text = stringResource(R.string.time_correction).uppercase(),
-            style = MaterialTheme.typography.titleSmall,
-            color = WonderAccent2
-        )
-        Spacer(Modifier.height(WonderSpacing.x4))
-        Text(
-            text = stringResource(R.string.prayer_correction_desc),
-            style = MaterialTheme.typography.bodySmall,
-            color = WonderCaption
-        )
-        if (calculatedTime != null) {
-            Spacer(Modifier.height(WonderSpacing.x16))
-            CorrectionPreview(calculatedTime, shift)
-        }
-        Spacer(Modifier.height(WonderSpacing.x12))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CircleButton(
-                icon = R.drawable.ph_minus_light,
-                contentDescription = stringResource(R.string.decrease),
-                onClick = { if (shift > -30) shift-- },
-                containerColor = WonderBlack
-            )
+        if (isJumua) {
+            Spacer(Modifier.height(WonderSpacing.x24))
             Text(
-                text = offsetLabel(shift, days = false),
-                style = MaterialTheme.typography.headlineMedium,
-                color = if (shift == 0) WonderOffWhite else WonderAccent1,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.width(176.dp)
+                text = stringResource(R.string.jumua_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = WonderCaption
             )
-            CircleButton(
-                icon = R.drawable.ph_plus_light,
-                contentDescription = stringResource(R.string.increase),
-                onClick = { if (shift < 30) shift++ },
-                containerColor = WonderBlack
+        } else {
+            Spacer(Modifier.height(WonderSpacing.x24))
+            Text(
+                text = stringResource(R.string.time_correction).uppercase(),
+                style = MaterialTheme.typography.titleSmall,
+                color = WonderAccent2
             )
+            Spacer(Modifier.height(WonderSpacing.x4))
+            Text(
+                text = stringResource(R.string.prayer_correction_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = WonderCaption
+            )
+            if (calculatedTime != null) {
+                Spacer(Modifier.height(WonderSpacing.x16))
+                CorrectionPreview(calculatedTime, shift)
+            }
+            Spacer(Modifier.height(WonderSpacing.x12))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircleButton(
+                    icon = R.drawable.ph_minus_light,
+                    contentDescription = stringResource(R.string.decrease),
+                    onClick = { if (shift > -30) shift-- },
+                    containerColor = WonderBlack
+                )
+                Text(
+                    text = offsetLabel(shift, days = false),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = if (shift == 0) WonderOffWhite else WonderAccent1,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.width(176.dp)
+                )
+                CircleButton(
+                    icon = R.drawable.ph_plus_light,
+                    contentDescription = stringResource(R.string.increase),
+                    onClick = { if (shift < 30) shift++ },
+                    containerColor = WonderBlack
+                )
+            }
         }
 
         Spacer(Modifier.height(WonderSpacing.x32))
@@ -970,6 +1109,13 @@ private fun markNotificationsAnswered(context: Context) {
 
 private const val NOTIF_PERM_PREFS = "settings_notif_perm"
 private const val NOTIF_ANSWERED = "notifications_answered"
+
+/** Android's "Do Not Disturb access" list, where the app can be allowed. */
+private fun openDndAccessSettings(context: Context) {
+    context.startActivity(
+        Intent(SystemSettings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    )
+}
 
 private fun openNotificationSettings(context: Context) {
     val intent = if (Build.VERSION.SDK_INT >= 26) {

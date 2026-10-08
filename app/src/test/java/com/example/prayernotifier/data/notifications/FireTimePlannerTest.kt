@@ -4,6 +4,7 @@ import com.example.prayernotifier.data.PrayerTimings
 import com.example.prayernotifier.data.persistence.AppSettings
 import com.example.prayernotifier.data.persistence.PrayerNotificationSettings
 import com.example.prayernotifier.data.persistence.PrayerTimeAdjustments
+import com.example.prayernotifier.data.persistence.SilenceSettings
 import java.time.LocalDate
 import java.time.Month
 import java.time.ZoneId
@@ -100,6 +101,68 @@ class FireTimePlannerTest {
         val plan = FireTimePlanner.plan(date, timings, settings, at(11, 40))
         val dhuhr = plan.planned.first { it.prayer == "Dhuhr" }
         assertEquals(at(11, 45), dhuhr.fireAt) // 12:45 − 60 min; still future at 11:40.
+    }
+
+    @Test fun `silence starts at each adhan and lasts 35 min for Fajr, 15 for the others`() {
+        val plan = FireTimePlanner.plan(date, timings, AppSettings(), at(4, 0))
+        assertEquals(listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"), plan.silences.map { it.prayer })
+        val fajr = plan.silences.first()
+        assertEquals(at(5, 12), fajr.startAt)
+        assertEquals(at(5, 47), fajr.endAt)
+        val asr = plan.silences.first { it.prayer == "Asr" }
+        assertEquals(at(16, 10), asr.startAt)
+        assertEquals(at(16, 25), asr.endAt)
+    }
+
+    @Test fun `silence follows the prayer's time correction`() {
+        val settings = AppSettings(timeAdjustments = PrayerTimeAdjustments(maghribAdjustment = 3))
+        val maghrib = FireTimePlanner.plan(date, timings, settings, at(4, 0)).silences.first { it.prayer == "Maghrib" }
+        assertEquals(at(18, 55), maghrib.startAt)
+    }
+
+    @Test fun `silence switched off plans none, and per prayer skips that prayer`() {
+        val off = AppSettings(silence = SilenceSettings(enabled = false))
+        assertTrue(FireTimePlanner.plan(date, timings, off, at(4, 0)).silences.isEmpty())
+
+        val noAsr = AppSettings(silence = SilenceSettings(asr = false))
+        assertEquals(
+            listOf("Fajr", "Dhuhr", "Maghrib", "Isha"),
+            FireTimePlanner.plan(date, timings, noAsr, at(4, 0)).silences.map { it.prayer }
+        )
+    }
+
+    @Test fun `a silence whose adhan has passed is not started late`() {
+        // 12:50 is inside Dhuhr's window (12:45 to 13:00): re-planning must not turn it back on.
+        val plan = FireTimePlanner.plan(date, timings, AppSettings(), at(12, 50))
+        assertEquals(listOf("Asr", "Maghrib", "Isha"), plan.silences.map { it.prayer })
+    }
+
+    @Test fun `on Friday Dhuhr is Jumua, reminded 30 min before and silent for an hour`() {
+        val friday = LocalDate.of(2026, Month.SEPTEMBER, 18)
+        val morning = ZonedDateTime.of(friday, java.time.LocalTime.of(4, 0), zone)
+        val plan = FireTimePlanner.plan(friday, timings, AppSettings(), morning)
+
+        val jumua = plan.planned.first { it.prayer == "Jumua" }
+        assertEquals(ZonedDateTime.of(friday, java.time.LocalTime.of(12, 15), zone), jumua.fireAt)
+        assertEquals(30, jumua.leadMinutes)
+        assertTrue(plan.planned.none { it.prayer == "Dhuhr" })
+
+        val silence = plan.silences.first { it.prayer == "Jumua" }
+        assertEquals(ZonedDateTime.of(friday, java.time.LocalTime.of(13, 45), zone), silence.endAt)
+    }
+
+    @Test fun `Jumua has its own switches`() {
+        val friday = LocalDate.of(2026, Month.SEPTEMBER, 18)
+        val morning = ZonedDateTime.of(friday, java.time.LocalTime.of(4, 0), zone)
+        val settings = AppSettings(
+            jumuaSettings = PrayerNotificationSettings(enabled = false),
+            silence = SilenceSettings(jumua = false)
+        )
+        val plan = FireTimePlanner.plan(friday, timings, settings, morning)
+        assertTrue(plan.planned.none { it.prayer == "Jumua" })
+        assertTrue(plan.silences.none { it.prayer == "Jumua" })
+        // Dhuhr's own switches don't apply on Friday, and Jumua's don't on other days.
+        assertTrue(FireTimePlanner.plan(date, timings, settings, at(4, 0)).planned.any { it.prayer == "Dhuhr" })
     }
 
     @Test fun `replenish is next day at 00-01`() {

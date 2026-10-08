@@ -10,12 +10,14 @@ import com.example.prayernotifier.data.location.AndroidGeocoderProvider
 import com.example.prayernotifier.data.location.FusedPositionProvider
 import com.example.prayernotifier.data.location.LocationService
 import com.example.prayernotifier.data.location.PrefsLocationStorage
+import com.example.prayernotifier.data.notifications.DoNotDisturbSilencer
 import com.example.prayernotifier.data.notifications.ExactAlarmScheduler
+import com.example.prayernotifier.data.notifications.PrayerAlarmHandler
 import com.example.prayernotifier.data.notifications.RealAlarmOps
+import com.example.prayernotifier.data.notifications.SilenceState
+import com.example.prayernotifier.data.notifications.SystemNotifier
 import com.example.prayernotifier.data.persistence.PrefsKeyValueStore
 import com.example.prayernotifier.data.persistence.SettingsStore
-import java.time.LocalDate
-import java.time.ZonedDateTime
 
 /**
  * UI-layer wiring. Thin glue only — logic lives in the tested data classes.
@@ -25,7 +27,8 @@ class UiGraph private constructor(app: Context) {
     private val context = app.applicationContext
     private val region = AndroidDeviceRegion(context)
 
-    val settingsStore = SettingsStore(PrefsKeyValueStore(context, "prayer_notifier_settings"))
+    private val settingsPrefs = PrefsKeyValueStore(context, "prayer_notifier_settings")
+    val settingsStore = SettingsStore(settingsPrefs)
     val locationService = LocationService(
         FusedPositionProvider(context),
         AndroidGeocoderProvider(context),
@@ -34,20 +37,29 @@ class UiGraph private constructor(app: Context) {
     )
     val prayerTimes = PrayerTimesRepository(deviceCountry = region::countryCode)
     val scheduler = ExactAlarmScheduler(context, RealAlarmOps(context))
+    val silencer = DoNotDisturbSilencer(context)
+    private val alarmHandler by lazy {
+        PrayerAlarmHandler(
+            locationService, prayerTimes, settingsStore, scheduler, SystemNotifier(context),
+            silencer, SilenceState(settingsPrefs)
+        )
+    }
+
+    /**
+     * Do Not Disturb at prayer time switched off: end a silence that is on
+     * now and remove the app's rule from the system settings.
+     */
+    suspend fun turnOffSilence() {
+        alarmHandler.endSilence()
+        silencer.remove()
+    }
 
     /**
      * Re-plans today's alarms for the current place. Called after the
      * place changes and after any settings change. Mirrors the Flutter app
      * re-scheduling on every settings save.
      */
-    suspend fun rescheduleToday(): Boolean {
-        val current = locationService.getCurrentSavedLocation() ?: return false
-        val settings = settingsStore.load()
-        val today = runCatching { prayerTimes.day(LocalDate.now(), current, settings) }.getOrNull()
-            ?: return false
-        scheduler.scheduleDay(today.date, today.timings, settings, ZonedDateTime.now())
-        return true
-    }
+    suspend fun rescheduleToday(): Boolean = alarmHandler.onDayChanged()
 
     companion object {
         /** Times downloaded by versions before on-device calculation. */
