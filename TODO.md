@@ -47,7 +47,7 @@ Goal: the app trusts no one with the user's location, Google included, and works
 
 ## Planned
 
-Do Not Disturb at prayer time and Jumua shipped in 0.2.0. Follow-ups:
+Do Not Disturb at prayer time and Jumua shipped in 0.2.0, editable silence lengths in 0.3.0. Follow-ups:
 
 - [ ] **Finish testing Do Not Disturb on Samsung One UI**
 
