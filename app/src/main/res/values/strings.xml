@@ -187,7 +187,7 @@
     <string name="caption_prayer_times">Times are calculated on your phone. Automatic follows your country\'s official method; change it if your mosque uses another.</string>
     <string name="caption_calendar">Move the Hijri date a day or two if your country starts the month earlier or later.</string>
     <string name="caption_language">The app\'s language, separate from the phone\'s if you like.</string>
-    <string name="dnd_locked">Allow Do Not Disturb access above to change these.</string>
+    <string name="dnd_locked">Until then, the settings below are locked.</string>
     <string name="dnd_window_today">%1$s · today %2$s to %3$s</string>
     <string name="silence_sheet_desc">How long the phone stays silent after the adhan, from 5 minutes to 2 hours. It comes back on by itself.</string>
     <string name="cd_silence_preview">Today silent from %1$s to %2$s</string>

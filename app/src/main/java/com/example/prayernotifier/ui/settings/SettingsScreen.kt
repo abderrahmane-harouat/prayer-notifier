@@ -67,6 +67,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -197,7 +198,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                 // Only notifications need the user: exact timing is granted
                 // without a prompt, and falls back to inexact if revoked.
                 if (!state.notificationsAllowed) {
-                    item {
+                    item(key = "notifications-banner") {
                         PermissionBanner(
                             title = stringResource(R.string.notifications_off),
                             body = stringResource(R.string.permission_needed),
@@ -207,7 +208,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     }
                 }
 
-                item {
+                item(key = "notifications") {
                     SectionEyebrow(stringResource(R.string.section_notifications), stringResource(R.string.caption_notifications))
                     ReminderForAllCard(
                         settings = state.settings,
@@ -215,7 +216,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     )
                 }
 
-                item {
+                item(key = "prayers") {
                     SectionEyebrow(stringResource(R.string.prayers), stringResource(R.string.caption_prayers))
                     WonderCard {
                         vm.prayerNames().forEachIndexed { index, prayer ->
@@ -236,7 +237,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     }
                 }
 
-                item {
+                item(key = "jumua") {
                     SectionEyebrow(stringResource(R.string.section_jumua), stringResource(R.string.caption_jumua))
                     WonderCard {
                         PrayerRow(
@@ -255,21 +256,35 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     }
                 }
 
-                item {
-                    SectionEyebrow(stringResource(R.string.section_dnd), stringResource(R.string.caption_dnd))
-                    // Granted only from Android's own settings screen, never a dialog.
-                    if (DND_SUPPORTED && state.settings.silence.enabled && !state.dndAllowed) {
+                item(key = "dnd-heading") {
+                    SectionEyebrow(stringResource(R.string.section_dnd), stringResource(R.string.caption_dnd), bottom = 0.dp)
+                }
+                // Granted only from Android's own settings screen, never a dialog.
+                // Until then nothing in the card can take effect, so it's all locked.
+                val dndLocked = DND_SUPPORTED && !state.dndAllowed
+                if (dndLocked) {
+                    item(key = "dnd-banner") {
                         PermissionBanner(
                             title = stringResource(R.string.dnd_access_title),
                             body = stringResource(R.string.dnd_access_desc),
                             action = stringResource(R.string.allow),
                             onClick = { openDndAccessSettings(context) }
                         )
-                        Spacer(Modifier.height(WonderSpacing.x16))
+                        Text(
+                            text = stringResource(R.string.dnd_locked),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = WonderCaption,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = WonderSpacing.x12, start = WonderSpacing.x8, end = WonderSpacing.x8)
+                        )
                     }
+                }
+                item(key = "dnd") {
                     SilenceCard(
                         silence = state.settings.silence,
-                        locked = !state.dndAllowed,
+                        locked = dndLocked,
                         adhanToday = state::adhanToday,
                         onToggle = { vm.setSilenceEnabled(it) },
                         onTogglePrayer = { prayer, on -> vm.setSilenceFor(prayer, on) },
@@ -277,7 +292,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     )
                 }
 
-                item {
+                item(key = "prayer-times") {
                     SectionEyebrow(stringResource(R.string.section_prayer_times), stringResource(R.string.caption_prayer_times))
                     WonderCard {
                         MetaRow(
@@ -302,7 +317,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     }
                 }
 
-                item {
+                item(key = "calendar") {
                     SectionEyebrow(stringResource(R.string.section_calendar), stringResource(R.string.caption_calendar))
                     WonderCard {
                         MetaRow(
@@ -313,7 +328,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     }
                 }
 
-                item {
+                item(key = "language") {
                     SectionEyebrow(stringResource(R.string.section_language), stringResource(R.string.caption_language))
                     WonderCard {
                         MetaRow(
@@ -324,7 +339,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     }
                 }
 
-                item {
+                item(key = "credits") {
                     OrnamentDivider(
                         color = WonderAccent2,
                         modifier = Modifier.padding(top = WonderSpacing.x24, bottom = WonderSpacing.x8)
@@ -468,13 +483,17 @@ private fun LanguageSheet(current: String, onSelect: (String) -> Unit) {
     }
 }
 
-/** Section ceremony: uppercase Tenor label between rules, then what the section is for. */
+/**
+ * Section ceremony: uppercase Tenor label between rules, then what the
+ * section is for. [bottom] is 0 when the heading is its own list entry,
+ * since the list already spaces entries apart.
+ */
 @Composable
-private fun SectionEyebrow(text: String, caption: String? = null) {
+private fun SectionEyebrow(text: String, caption: String? = null, bottom: Dp = WonderSpacing.x16) {
     EyebrowLabel(
         text = text,
         color = WonderAccent2,
-        modifier = Modifier.padding(top = WonderSpacing.x16, bottom = if (caption == null) WonderSpacing.x16 else WonderSpacing.x8)
+        modifier = Modifier.padding(top = WonderSpacing.x16, bottom = if (caption == null) bottom else WonderSpacing.x8)
     )
     if (caption != null) {
         Text(
@@ -485,7 +504,7 @@ private fun SectionEyebrow(text: String, caption: String? = null) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = WonderSpacing.x8)
-                .padding(bottom = WonderSpacing.x16)
+                .padding(bottom = bottom)
         )
     }
 }
@@ -563,9 +582,9 @@ private val DND_SUPPORTED = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 /**
  * The master switch, then each prayer with how long the phone stays
  * silent and, today, from when to when. Tap a prayer to change the length.
- * Without Do Not Disturb access the prayers are greyed out and locked:
- * nothing there can take effect until Android grants it. The master
- * switch stays usable, so the feature can still be turned off.
+ * Without Do Not Disturb access the whole card, main switch included, is
+ * greyed out and locked: none of it can take effect until Android grants
+ * the access. The banner above says why and leads there.
  */
 @Composable
 private fun SilenceCard(
@@ -576,46 +595,40 @@ private fun SilenceCard(
     onTogglePrayer: (String, Boolean) -> Unit,
     onOpenPrayer: (String) -> Unit
 ) {
+    val usable = DND_SUPPORTED && !locked
     WonderCard {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = DND_SUPPORTED, role = Role.Switch) { onToggle(!silence.enabled) }
-                .padding(horizontal = WonderSpacing.x24, vertical = WonderSpacing.x16),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.dnd_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = WonderOffWhite
-                )
-                Spacer(Modifier.height(WonderSpacing.x4))
-                Text(
-                    text = stringResource(if (DND_SUPPORTED) R.string.dnd_desc else R.string.dnd_needs_android10),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = WonderAccent2
-                )
-            }
-            Spacer(Modifier.width(WonderSpacing.x12))
-            Switch(
-                checked = DND_SUPPORTED && silence.enabled,
-                onCheckedChange = onToggle,
-                enabled = DND_SUPPORTED,
-                colors = wonderSwitchColors()
-            )
-        }
-        if (DND_SUPPORTED && silence.enabled) {
-            if (locked) {
-                WonderDivider()
-                Text(
-                    text = stringResource(R.string.dnd_locked),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = WonderCaption,
-                    modifier = Modifier.padding(horizontal = WonderSpacing.x24, vertical = WonderSpacing.x12)
+        // Locking only fades the card: nothing inside changes size, so
+        // the list doesn't move when access is granted.
+        Column(Modifier.alpha(if (locked) 0.4f else 1f)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = usable, role = Role.Switch) { onToggle(!silence.enabled) }
+                    .padding(horizontal = WonderSpacing.x24, vertical = WonderSpacing.x16),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.dnd_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = WonderOffWhite
+                    )
+                    Spacer(Modifier.height(WonderSpacing.x4))
+                    Text(
+                        text = stringResource(if (DND_SUPPORTED) R.string.dnd_desc else R.string.dnd_needs_android10),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = WonderAccent2
+                    )
+                }
+                Spacer(Modifier.width(WonderSpacing.x12))
+                Switch(
+                    checked = DND_SUPPORTED && silence.enabled,
+                    onCheckedChange = onToggle,
+                    enabled = usable,
+                    colors = wonderSwitchColors()
                 )
             }
-            Column(Modifier.alpha(if (locked) 0.4f else 1f)) {
+            if (DND_SUPPORTED && silence.enabled) {
                 (PrayerMath.ORDER + PrayerMath.JUMUA).forEach { prayer ->
                     WonderDivider()
                     SilenceRow(
@@ -623,7 +636,7 @@ private fun SilenceCard(
                         on = silence.isOnFor(prayer),
                         minutes = silence.minutesFor(prayer),
                         adhanToday = if (prayer == PrayerMath.JUMUA) null else adhanToday(prayer),
-                        enabled = !locked,
+                        enabled = usable,
                         onOpen = { onOpenPrayer(prayer) },
                         onToggle = { onTogglePrayer(prayer, it) }
                     )

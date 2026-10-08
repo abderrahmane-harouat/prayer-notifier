@@ -202,7 +202,7 @@
     <string name="caption_prayer_times">تُحسب المواقيت على هاتفك. الوضع التلقائي يتبع الطريقة الرسمية في بلدك؛ غيّرها إن كان مسجدك يتبع غيرها.</string>
     <string name="caption_calendar">قدّم التاريخ الهجري أو أخّره يومًا أو يومين إن كان بلدك يبدأ الشهر قبل ذلك أو بعده.</string>
     <string name="caption_language">لغة التطبيق، مستقلة عن لغة الهاتف إن شئت.</string>
-    <string name="dnd_locked">اسمح بإذن «عدم الإزعاج» أعلاه لتغيير هذه الإعدادات.</string>
+    <string name="dnd_locked">وحتى ذلك الحين تبقى الإعدادات أدناه مقفلة.</string>
     <string name="dnd_window_today">%1$s · اليوم من %2$s إلى %3$s</string>
     <string name="silence_sheet_desc">مدة صمت الهاتف بعد الأذان، من 5 دقائق إلى ساعتين. ثم يعود تلقائيًا.</string>
     <string name="cd_silence_preview">اليوم صامت من %1$s إلى %2$s</string>
