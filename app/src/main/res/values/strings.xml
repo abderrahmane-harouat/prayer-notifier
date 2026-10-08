@@ -132,6 +132,13 @@
     <string name="method_sheet_desc">Prayer times are calculated on your phone. Choose the method your local mosque follows, or let the app pick by country.</string>
     <string name="method_angles">Fajr %1$s° · Isha %2$s°</string>
     <string name="method_angles_interval">Fajr %1$s° · Isha %2$s min after Maghrib</string>
+    <string name="asr_time">Asr time</string>
+    <string name="asr_standard">Standard</string>
+    <string name="asr_standard_desc">Shafi\'i, Maliki, Hanbali: when a shadow is as long as its object</string>
+    <string name="asr_hanafi">Hanafi</string>
+    <string name="asr_hanafi_desc">When a shadow is twice as long as its object (later)</string>
+    <string name="cd_correction_preview">Today at %1$s</string>
+    <string name="cd_correction_preview_shifted">Today at %1$s, %2$s with this correction</string>
     <string name="method_mwl">Muslim World League</string>
     <string name="method_egypt">Egypt</string>
     <string name="method_umm_al_qura">Umm al-Qura, Makkah</string>

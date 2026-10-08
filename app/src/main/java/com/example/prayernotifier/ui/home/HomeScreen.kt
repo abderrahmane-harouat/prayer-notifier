@@ -98,7 +98,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.prayernotifier.R
 import com.example.prayernotifier.data.LocalUiGraph
 import com.example.prayernotifier.data.PrayerMath
-import com.example.prayernotifier.data.PrayerTimings
 import com.example.prayernotifier.data.calculation.PrayerCalculator
 import com.example.prayernotifier.data.persistence.PrayerNotificationSettings
 import com.example.prayernotifier.i18n.prayerNameRes
@@ -574,7 +573,7 @@ private fun HomeContent(
                     prayer = prayer,
                     subtitle = if (isArabic) prayer else ARABIC_NAMES[prayer].orEmpty(),
                     time = PrayerMath.adjustTime(
-                        timingOf(day.timings, prayer),
+                        PrayerMath.timeOf(day.timings, prayer),
                         adjustments.getAdjustmentForPrayer(prayer)
                     ),
                     reminder = state.settings.getSettingsForPrayer(prayer),
@@ -955,15 +954,6 @@ private fun shouldAskNotificationsOnce(context: Context): Boolean {
 }
 
 private const val NOTIF_ASKED_ON_START = "notifications_asked_on_start"
-
-private fun timingOf(timings: PrayerTimings, prayer: String): String = when (prayer) {
-    "Fajr" -> timings.fajr
-    "Dhuhr" -> timings.dhuhr
-    "Asr" -> timings.asr
-    "Maghrib" -> timings.maghrib
-    "Isha" -> timings.isha
-    else -> ""
-}
 
 private fun hasLocationPermission(context: Context): Boolean {
     val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)

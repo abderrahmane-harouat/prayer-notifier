@@ -143,6 +143,13 @@
     <string name="method_sheet_desc">تُحسب مواقيت الصلاة على هاتفك. اختر الطريقة التي يتبعها مسجدك، أو دع التطبيق يختار حسب البلد.</string>
     <string name="method_angles">الفجر %1$s° · العشاء %2$s°</string>
     <string name="method_angles_interval">الفجر %1$s° · العشاء بعد المغرب بـ%2$s دقيقة</string>
+    <string name="asr_time">وقت العصر</string>
+    <string name="asr_standard">الجمهور</string>
+    <string name="asr_standard_desc">الشافعي والمالكي والحنبلي: حين يصير ظلّ الشيء مثله</string>
+    <string name="asr_hanafi">الحنفي</string>
+    <string name="asr_hanafi_desc">حين يصير ظلّ الشيء مثليه (أي بعد ذلك)</string>
+    <string name="cd_correction_preview">اليوم عند %1$s</string>
+    <string name="cd_correction_preview_shifted">اليوم عند %1$s، وبهذا التعديل %2$s</string>
     <string name="method_mwl">رابطة العالم الإسلامي</string>
     <string name="method_egypt">مصر</string>
     <string name="method_umm_al_qura">أم القرى، مكة المكرمة</string>

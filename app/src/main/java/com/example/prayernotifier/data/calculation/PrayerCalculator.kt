@@ -21,8 +21,8 @@ import java.util.Date
 /**
  * Prayer times from the sun's position, on the device: no network, no
  * stored tables, any date. Astronomy by the Adhan library; Asr by the
- * shadow-length rule of the majority (Shafi'i, Maliki, Hanbali), and the
- * twilight-angle rule at high latitudes, as the Aladhan API did.
+ * shadow-length rule of [AsrMethod], and the twilight-angle rule at high
+ * latitudes, as the Aladhan API did.
  */
 object PrayerCalculator {
 
@@ -35,11 +35,12 @@ object PrayerCalculator {
         latitude: Double,
         longitude: Double,
         zone: ZoneId,
-        method: CalculationMethod
+        method: CalculationMethod,
+        asr: AsrMethod = AsrMethod.STANDARD
     ): PrayerDay {
         val coordinates = Coordinates(latitude, longitude)
         val components = DateComponents(date.year, date.monthValue, date.dayOfMonth)
-        val times = PrayerTimes(coordinates, components, parametersFor(method))
+        val times = PrayerTimes(coordinates, components, parametersFor(method, asr))
         val maghrib = when (val angle = method.maghribAngle) {
             // The evening moment the sun reaches the angle: what Adhan
             // computes as Isha for an Isha angle of that size.
@@ -72,9 +73,10 @@ object PrayerCalculator {
         latitude: Double,
         longitude: Double,
         zone: ZoneId,
-        method: CalculationMethod
+        method: CalculationMethod,
+        asr: AsrMethod = AsrMethod.STANDARD
     ): List<PrayerDay> = (1..month.lengthOfMonth()).map {
-        day(month.atDay(it), latitude, longitude, zone, method)
+        day(month.atDay(it), latitude, longitude, zone, method, asr)
     }
 
     /**
@@ -90,14 +92,14 @@ object PrayerCalculator {
         )
     }.getOrNull()
 
-    private fun parametersFor(method: CalculationMethod): CalculationParameters {
+    private fun parametersFor(method: CalculationMethod, asr: AsrMethod): CalculationParameters {
         val parameters = if (method.ishaMinutes > 0) {
             // Isha is set from Maghrib above; the angle here is unused.
             CalculationParameters(method.fajrAngle, method.ishaMinutes)
         } else {
             CalculationParameters(method.fajrAngle, method.ishaAngle)
         }
-        parameters.madhab = Madhab.SHAFI
+        parameters.madhab = if (asr == AsrMethod.HANAFI) Madhab.HANAFI else Madhab.SHAFI
         parameters.highLatitudeRule = HighLatitudeRule.TWILIGHT_ANGLE
         // Maghrib's offset is applied above, where Isha intervals build on it.
         parameters.methodAdjustments = PrayerAdjustments(0, 0, method.dhuhrMinutes, method.asrMinutes, 0, 0)

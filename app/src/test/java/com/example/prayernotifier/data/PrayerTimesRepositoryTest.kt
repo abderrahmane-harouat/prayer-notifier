@@ -1,5 +1,6 @@
 package com.example.prayernotifier.data
 
+import com.example.prayernotifier.data.calculation.AsrMethod
 import com.example.prayernotifier.data.calculation.CalculationMethod
 import com.example.prayernotifier.data.calculation.PrayerCalculator
 import com.example.prayernotifier.data.location.CurrentLocation
@@ -52,6 +53,23 @@ class PrayerTimesRepositoryTest {
         val expected = PrayerCalculator.day(date, 36.7538, 3.0588, ZoneId.of("Africa/Algiers"), CalculationMethod.ALGERIA)
         assertEquals(expected, repository.day(date, algiers, AppSettings()))
         assertEquals("05:23", expected.timings.fajr)
+    }
+
+    @Test
+    fun `Asr follows the country unless the user picked a rule`() {
+        val karachi = CurrentLocation("Karachi", 24.8607, 67.0011, "PK", "Asia/Karachi")
+        assertEquals(AsrMethod.HANAFI, repository.asrFor(karachi, AppSettings()))
+        assertEquals(AsrMethod.STANDARD, repository.asrFor(algiers, AppSettings()))
+
+        val standard = AppSettings(asrMethod = AsrMethod.STANDARD.name)
+        assertEquals(AsrMethod.STANDARD, repository.asrFor(karachi, standard))
+        assertEquals(AsrMethod.HANAFI, repository.automaticAsrFor(karachi))
+
+        val date = LocalDate.of(2026, 10, 8)
+        val expected = PrayerCalculator.day(
+            date, 24.8607, 67.0011, ZoneId.of("Asia/Karachi"), CalculationMethod.KARACHI, AsrMethod.HANAFI
+        )
+        assertEquals(expected, repository.day(date, karachi, AppSettings()))
     }
 
     @Test

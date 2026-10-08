@@ -1,5 +1,6 @@
 package com.example.prayernotifier.data.persistence
 
+import com.example.prayernotifier.data.calculation.AsrMethod
 import com.example.prayernotifier.data.calculation.CalculationMethod
 import kotlinx.serialization.Serializable
 
@@ -59,7 +60,9 @@ data class AppSettings(
     val darkMode: Boolean = false,
     val hijriDateAdjustment: Int = 0,
     /** A [CalculationMethod] name the user picked; null = by the place's country. */
-    val calculationMethod: String? = null
+    val calculationMethod: String? = null,
+    /** An [AsrMethod] name the user picked; null = by the place's country. */
+    val asrMethod: String? = null
 ) {
     fun getSettingsForPrayer(prayerName: String): PrayerNotificationSettings = when (prayerName) {
         "Fajr" -> fajrSettings
@@ -73,4 +76,8 @@ data class AppSettings(
     /** The user's own choice of method, or null to follow the country. */
     val chosenMethod: CalculationMethod?
         get() = CalculationMethod.fromName(calculationMethod)
+
+    /** The user's own choice for Asr, or null to follow the country. */
+    val chosenAsr: AsrMethod?
+        get() = AsrMethod.fromName(asrMethod)
 }

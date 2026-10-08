@@ -32,6 +32,17 @@ class CountryMethodsTest {
     }
 
     @Test
+    fun `South Asia and Afghanistan use Hanafi Asr, others standard`() {
+        listOf("PK", "IN", "BD", "AF", "pk").forEach {
+            assertEquals(it, AsrMethod.HANAFI, CountryMethods.asrForCountry(it))
+        }
+        listOf("DZ", "SA", "TR", "GB").forEach {
+            assertEquals(it, AsrMethod.STANDARD, CountryMethods.asrForCountry(it))
+        }
+        assertEquals(AsrMethod.STANDARD, CountryMethods.asrForCountry(null))
+    }
+
+    @Test
     fun `codes match in any case`() {
         assertEquals(CalculationMethod.ALGERIA, CountryMethods.forCountry("dz"))
     }

@@ -61,6 +61,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,6 +77,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.prayernotifier.R
 import com.example.prayernotifier.data.LocalUiGraph
 import com.example.prayernotifier.data.PrayerMath
+import com.example.prayernotifier.data.calculation.AsrMethod
 import com.example.prayernotifier.data.calculation.CalculationMethod
 import com.example.prayernotifier.data.persistence.AppSettings
 import com.example.prayernotifier.data.persistence.PrayerNotificationSettings
@@ -106,6 +109,7 @@ import com.example.prayernotifier.ui.theme.thmanyahAvailable
 private sealed interface Sheet {
     data object Hijri : Sheet
     data object Method : Sheet
+    data object Asr : Sheet
     data class Prayer(val prayer: String) : Sheet
     data object Language : Sheet
 }
@@ -234,6 +238,16 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                             },
                             onClick = { sheet = Sheet.Method }
                         )
+                        WonderDivider()
+                        MetaRow(
+                            label = stringResource(R.string.asr_time),
+                            value = if (state.settings.chosenAsr == null) {
+                                stringResource(R.string.method_automatic_value, stringResource(asrNameRes(state.asr)))
+                            } else {
+                                stringResource(asrNameRes(state.asr))
+                            },
+                            onClick = { sheet = Sheet.Asr }
+                        )
                     }
                 }
 
@@ -310,8 +324,14 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     automatic = state.automaticMethod,
                     onSelect = { vm.setMethod(it); sheet = null }
                 )
+                Sheet.Asr -> AsrSheet(
+                    chosen = state.settings.chosenAsr,
+                    automatic = state.automaticAsr,
+                    onSelect = { vm.setAsr(it); sheet = null }
+                )
                 is Sheet.Prayer -> PrayerSheet(
                     prayer = current.prayer,
+                    calculatedTime = state.today?.let { PrayerMath.timeOf(it, current.prayer) },
                     reminder = state.settings.getSettingsForPrayer(current.prayer),
                     adjustment = vm.adjustmentOf(current.prayer),
                     onSave = { notif, adjustment ->
@@ -645,6 +665,37 @@ private fun MethodOption(title: String, description: String, selected: Boolean, 
     }
 }
 
+/** Automatic (the country's rule, named), then the two rules explained. */
+@Composable
+private fun AsrSheet(
+    chosen: AsrMethod?,
+    automatic: AsrMethod,
+    onSelect: (AsrMethod?) -> Unit
+) {
+    SheetColumn(title = stringResource(R.string.asr_time)) {
+        MethodOption(
+            title = stringResource(R.string.method_automatic),
+            description = stringResource(R.string.method_automatic_desc, stringResource(asrNameRes(automatic))),
+            selected = chosen == null,
+            onClick = { onSelect(null) }
+        )
+        AsrMethod.entries.forEach { asr ->
+            HorizontalDivider(thickness = 1.dp, color = WonderBlack)
+            MethodOption(
+                title = stringResource(asrNameRes(asr)),
+                description = stringResource(
+                    if (asr == AsrMethod.HANAFI) R.string.asr_hanafi_desc else R.string.asr_standard_desc
+                ),
+                selected = chosen == asr,
+                onClick = { onSelect(asr) }
+            )
+        }
+    }
+}
+
+private fun asrNameRes(asr: AsrMethod): Int =
+    if (asr == AsrMethod.HANAFI) R.string.asr_hanafi else R.string.asr_standard
+
 /** "Fajr 18° · Isha 17°", or Isha as minutes after Maghrib. */
 @Composable
 private fun methodAngles(method: CalculationMethod): String {
@@ -718,6 +769,8 @@ private fun StepperSheet(
 @Composable
 private fun PrayerSheet(
     prayer: String,
+    /** Today's time before correction; null when there is no place yet. */
+    calculatedTime: String?,
     reminder: PrayerNotificationSettings,
     adjustment: Int,
     onSave: (PrayerNotificationSettings, Int) -> Unit,
@@ -768,6 +821,10 @@ private fun PrayerSheet(
             style = MaterialTheme.typography.bodySmall,
             color = WonderCaption
         )
+        if (calculatedTime != null) {
+            Spacer(Modifier.height(WonderSpacing.x16))
+            CorrectionPreview(calculatedTime, shift)
+        }
         Spacer(Modifier.height(WonderSpacing.x12))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -803,6 +860,55 @@ private fun PrayerSheet(
         )
         Spacer(Modifier.height(WonderSpacing.x8))
         WonderTextButton(text = stringResource(R.string.cancel), onClick = onCancel)
+    }
+}
+
+/**
+ * Today's time as calculated and, while a correction is set, the time it
+ * becomes: "12:35 › 12:40". Updates with every tap of the stepper.
+ */
+@Composable
+private fun CorrectionPreview(calculatedTime: String, shift: Int) {
+    val corrected = PrayerMath.adjustTime(calculatedTime, shift)
+    val description = if (shift == 0) {
+        stringResource(R.string.cd_correction_preview, calculatedTime)
+    } else {
+        stringResource(R.string.cd_correction_preview_shifted, calculatedTime, corrected)
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics { contentDescription = description },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = stringResource(R.string.today).uppercase(),
+            style = MaterialTheme.typography.titleSmall,
+            color = WonderAccent2
+        )
+        Spacer(Modifier.height(WonderSpacing.x4))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = calculatedTime,
+                style = MaterialTheme.typography.headlineMedium,
+                color = if (shift == 0) WonderOffWhite else WonderCaption
+            )
+            if (shift != 0) {
+                Icon(
+                    painter = painterResource(R.drawable.ph_caret_right_light),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(horizontal = WonderSpacing.x8)
+                        .size(20.dp),
+                    tint = WonderCaption
+                )
+                Text(
+                    text = corrected,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = WonderAccent1
+                )
+            }
+        }
     }
 }
 

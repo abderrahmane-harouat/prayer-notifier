@@ -33,6 +33,16 @@ class PrayerMathTest {
         assertEquals("05:07", PrayerMath.adjustTime("05:12", -5))
     }
 
+    @Test fun `keeps Western digits when the phone is in Arabic`() {
+        val before = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.forLanguageTag("ar"))
+            assertEquals("05:17", PrayerMath.adjustTime("05:12", 5))
+        } finally {
+            java.util.Locale.setDefault(before)
+        }
+    }
+
     @Test fun `pads single digits`() {
         assertEquals("05:07", PrayerMath.adjustTime("5:2", 5))
     }
@@ -134,7 +144,12 @@ class PrayerMathTest {
 
     //endregion
 
-    //region hijri
+    //region timeOf
+
+    @Test fun `time of each prayer before corrections`() {
+        assertEquals(PrayerMath.ORDER.map { PrayerMath.timeOf(timings, it) },
+            listOf(timings.fajr, timings.dhuhr, timings.asr, timings.maghrib, timings.isha))
+    }
 
     //endregion
 }

@@ -3,7 +3,9 @@ package com.example.prayernotifier.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.prayernotifier.data.PrayerMath
+import com.example.prayernotifier.data.PrayerTimings
 import com.example.prayernotifier.data.UiGraph
+import com.example.prayernotifier.data.calculation.AsrMethod
 import com.example.prayernotifier.data.calculation.CalculationMethod
 import com.example.prayernotifier.data.persistence.AppSettings
 import com.example.prayernotifier.data.persistence.PrayerNotificationSettings
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import kotlinx.coroutines.withContext
 
 data class SettingsUiState(
@@ -21,10 +24,21 @@ data class SettingsUiState(
     val settings: AppSettings = AppSettings(),
     val notificationsAllowed: Boolean = true,
     /** The method "automatic" picks for the current place's country. */
-    val automaticMethod: CalculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE
+    val automaticMethod: CalculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,
+    /** The Asr rule "automatic" picks for the current place's country. */
+    val automaticAsr: AsrMethod = AsrMethod.STANDARD,
+    /**
+     * Today's calculated times at the current place, before the user's
+     * corrections, so a correction can be judged against them. Null
+     * without a place.
+     */
+    val today: PrayerTimings? = null
 ) {
     /** The method the times actually use. */
     val method: CalculationMethod get() = settings.chosenMethod ?: automaticMethod
+
+    /** The Asr rule the times actually use. */
+    val asr: AsrMethod get() = settings.chosenAsr ?: automaticAsr
 }
 
 class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
@@ -39,10 +53,27 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             val settings = withContext(Dispatchers.IO) { graph.settingsStore.load() }
-            val place = withContext(Dispatchers.IO) { graph.locationService.getCurrentSavedLocation() }
-            val automatic = place?.let { graph.prayerTimes.automaticMethodFor(it) }
-                ?: CalculationMethod.MUSLIM_WORLD_LEAGUE
-            _state.update { it.copy(loading = false, settings = settings, automaticMethod = automatic) }
+            showPlaceTimes(settings)
+            _state.update { it.copy(loading = false) }
+        }
+    }
+
+    /** What "automatic" means at the current place, and today's times there. */
+    private suspend fun showPlaceTimes(settings: AppSettings) {
+        val place = withContext(Dispatchers.IO) { graph.locationService.getCurrentSavedLocation() }
+        val today = place?.let {
+            withContext(Dispatchers.Default) {
+                runCatching { graph.prayerTimes.day(LocalDate.now(), it, settings).timings }.getOrNull()
+            }
+        }
+        _state.update {
+            it.copy(
+                settings = settings,
+                automaticMethod = place?.let(graph.prayerTimes::automaticMethodFor)
+                    ?: CalculationMethod.MUSLIM_WORLD_LEAGUE,
+                automaticAsr = place?.let(graph.prayerTimes::automaticAsrFor) ?: AsrMethod.STANDARD,
+                today = today
+            )
         }
     }
 
@@ -56,13 +87,19 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
                 graph.settingsStore.save(next)
                 graph.rescheduleToday()
             }
-            _state.update { it.copy(settings = next) }
+            // The method or Asr rule may have changed today's times.
+            showPlaceTimes(next)
         }
     }
 
     /** Null goes back to the method of the place's country. */
     fun setMethod(method: CalculationMethod?) {
         persist(_state.value.settings.copy(calculationMethod = method?.name))
+    }
+
+    /** Null goes back to the Asr rule of the place's country. */
+    fun setAsr(asr: AsrMethod?) {
+        persist(_state.value.settings.copy(asrMethod = asr?.name))
     }
 
     fun setHijriOffset(days: Int) {

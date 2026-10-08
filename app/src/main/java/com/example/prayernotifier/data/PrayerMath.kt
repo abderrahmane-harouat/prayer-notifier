@@ -4,6 +4,7 @@ import com.example.prayernotifier.data.persistence.PrayerTimeAdjustments
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.util.Locale
 
 data class Countdown(val nextPrayer: String, val remaining: Duration)
 
@@ -20,13 +21,26 @@ object PrayerMath {
 
     val ORDER = listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha")
 
-    /** Shifts a "HH:mm" time by minutes, wrapping around midnight. */
+    /**
+     * Shifts a "HH:mm" time by minutes, wrapping around midnight. Always
+     * Western digits, like the calculated times, whatever the language.
+     */
     fun adjustTime(time: String, minutes: Int): String {
         if (minutes == 0) return time
         val parts = time.split(":")
         val total = parts[0].toInt() * 60 + parts[1].toInt() + minutes
         val wrapped = Math.floorMod(total, 24 * 60)
-        return "%02d:%02d".format(wrapped / 60, wrapped % 60)
+        return String.format(Locale.ROOT, "%02d:%02d", wrapped / 60, wrapped % 60)
+    }
+
+    /** One prayer's "HH:mm" time, before any correction. */
+    fun timeOf(timings: PrayerTimings, prayer: String): String = when (prayer) {
+        "Fajr" -> timings.fajr
+        "Dhuhr" -> timings.dhuhr
+        "Asr" -> timings.asr
+        "Maghrib" -> timings.maghrib
+        "Isha" -> timings.isha
+        else -> error("Unknown prayer: $prayer")
     }
 
     /** Adjusted date-time of one prayer on a given date. */
@@ -36,14 +50,7 @@ object PrayerMath {
         prayer: String,
         date: LocalDate
     ): LocalDateTime {
-        val base = when (prayer) {
-            "Fajr" -> timings.fajr
-            "Dhuhr" -> timings.dhuhr
-            "Asr" -> timings.asr
-            "Maghrib" -> timings.maghrib
-            "Isha" -> timings.isha
-            else -> error("Unknown prayer: $prayer")
-        }
+        val base = timeOf(timings, prayer)
         val shifted = adjustTime(base, adjustments.getAdjustmentForPrayer(prayer))
         val (hour, minute) = shifted.split(":").map { it.toInt() }
         return date.atTime(hour, minute)

@@ -46,10 +46,17 @@ object CountryMethods {
         AFRICA.forEach { putIfAbsent(it, CalculationMethod.EGYPT) }
     }
 
+    /** Where official and mosque timetables use the later, Hanafi Asr. */
+    private val HANAFI_ASR = setOf("PK", "IN", "BD", "AF")
+
     /** The method for a country code (any case), or Muslim World League. */
     fun forCountry(countryCode: String?): CalculationMethod =
         countryCode?.uppercase(Locale.ROOT)?.let { BY_COUNTRY[it] }
             ?: CalculationMethod.MUSLIM_WORLD_LEAGUE
+
+    /** Hanafi Asr in South Asia and Afghanistan, standard elsewhere. */
+    fun asrForCountry(countryCode: String?): AsrMethod =
+        if (countryCode?.uppercase(Locale.ROOT) in HANAFI_ASR) AsrMethod.HANAFI else AsrMethod.STANDARD
 }
 
 /** African countries; those with their own method above keep it. */

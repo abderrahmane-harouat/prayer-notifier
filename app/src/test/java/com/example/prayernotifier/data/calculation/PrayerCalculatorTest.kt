@@ -68,6 +68,36 @@ class PrayerCalculatorTest {
         }
     }
 
+    /** Same independent computation, for a shadow twice its object's length. */
+    @Test
+    fun `Hanafi Asr matches the sun's position within a minute`() {
+        listOf(
+            Triple("2026-01-15", 24.8607 to 67.0011, "Asia/Karachi") to "16:28",
+            Triple("2026-06-21", 24.8607 to 67.0011, "Asia/Karachi") to "17:16",
+            Triple("2026-10-08", 31.5204 to 74.3587, "Asia/Karachi") to "15:59",
+            Triple("2027-02-20", 23.8103 to 90.4125, "Asia/Dhaka") to "16:19",
+            Triple("2026-10-08", 51.5074 to -0.1278, "Europe/London") to "16:29"
+        ).forEach { (place, expected) ->
+            val (date, coordinates, zone) = place
+            val asr = PrayerCalculator.day(
+                LocalDate.parse(date), coordinates.first, coordinates.second, ZoneId.of(zone),
+                CalculationMethod.KARACHI, AsrMethod.HANAFI
+            ).timings.asr
+            assertTrue("$zone $date: $asr, expected $expected", minutesBetween(asr, expected) <= 1)
+        }
+    }
+
+    @Test
+    fun `Hanafi changes only Asr`() {
+        fun karachi(asr: AsrMethod) = PrayerCalculator.day(
+            LocalDate.of(2026, 10, 8), 24.8607, 67.0011, ZoneId.of("Asia/Karachi"), CalculationMethod.KARACHI, asr
+        ).timings
+        val standard = karachi(AsrMethod.STANDARD)
+        val hanafi = karachi(AsrMethod.HANAFI)
+        assertEquals(standard.copy(asr = hanafi.asr), hanafi)
+        assertTrue(LocalTime.parse(hanafi.asr).isAfter(LocalTime.parse(standard.asr)))
+    }
+
     @Test
     fun `Turkey adds Diyanet's temkin minutes`() {
         fun istanbul(method: CalculationMethod) = PrayerCalculator.day(

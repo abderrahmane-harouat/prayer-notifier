@@ -174,11 +174,13 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
         }
     }
 
-    /** A new calculation method changes the times themselves: recalculate. */
+    /** A new calculation method or Asr rule changes the times themselves: recalculate. */
     fun refreshSettings() {
         viewModelScope.launch {
             val settings = withContext(Dispatchers.IO) { graph.settingsStore.load() }
-            val methodChanged = settings.calculationMethod != _state.value.settings.calculationMethod
+            val before = _state.value.settings
+            val methodChanged = settings.calculationMethod != before.calculationMethod ||
+                settings.asrMethod != before.asrMethod
             _state.update { it.copy(settings = settings) }
             if (methodChanged && current != null) loadMonth(itSelected())
         }
