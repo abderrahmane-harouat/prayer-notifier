@@ -1,40 +1,32 @@
 package com.example.prayernotifier.data.notifications
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
+import com.example.prayernotifier.data.PrayerTimesRepository
 import com.example.prayernotifier.data.PrayerTimings
+import com.example.prayernotifier.data.calculation.CalculationMethod
+import com.example.prayernotifier.data.calculation.PrayerCalculator
+import com.example.prayernotifier.data.location.CurrentLocation
+import com.example.prayernotifier.data.location.DeviceRegion
 import com.example.prayernotifier.data.location.GeocodeProvider
+import com.example.prayernotifier.data.location.GeocodedPlace
 import com.example.prayernotifier.data.location.InMemoryLocationStorage
 import com.example.prayernotifier.data.location.LocationService
 import com.example.prayernotifier.data.location.PositionOutcome
 import com.example.prayernotifier.data.location.PositionProvider
-import com.example.prayernotifier.data.location.SavedLocation
 import com.example.prayernotifier.data.persistence.AppSettings
 import com.example.prayernotifier.data.persistence.InMemoryKeyValueStore
-import com.example.prayernotifier.data.persistence.PrayerDatabase
-import com.example.prayernotifier.data.persistence.RoomPrayerTimesCache
 import com.example.prayernotifier.data.persistence.SettingsStore
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
 class PrayerAlarmHandlerTest {
 
-    private lateinit var db: PrayerDatabase
     private lateinit var storage: InMemoryLocationStorage
     private lateinit var settingsStore: SettingsStore
     private lateinit var scheduler: FakeScheduler
@@ -43,22 +35,18 @@ class PrayerAlarmHandlerTest {
 
     private val zone = ZoneId.systemDefault()
     private val today = LocalDate.now(zone)
-    private val readable = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)
+    private val mecca = CurrentLocation("Mecca", 21.4225, 39.8262, "SA", "Asia/Riyadh")
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            PrayerDatabase::class.java
-        ).allowMainThreadQueries().build()
         storage = InMemoryLocationStorage()
         settingsStore = SettingsStore(InMemoryKeyValueStore())
         scheduler = FakeScheduler()
         notifier = FakeNotifier()
-        val location = LocationService(FakePositions(), FakeGeocode(), storage)
+        val location = LocationService(FakePositions(), FakeGeocode(), storage, FakeRegion())
         handler = PrayerAlarmHandler(
             location,
-            RoomPrayerTimesCache(db.prayerDayDao()),
+            PrayerTimesRepository(deviceCountry = { null }),
             settingsStore,
             scheduler,
             notifier,
@@ -66,47 +54,27 @@ class PrayerAlarmHandlerTest {
         )
     }
 
-    @After
-    fun tearDown() {
-        db.close()
-    }
+    private fun expected(method: CalculationMethod): PrayerTimings =
+        PrayerCalculator.day(today, mecca.latitude, mecca.longitude, ZoneId.of("Asia/Riyadh"), method).timings
 
-    private suspend fun seedToday() {
-        storage.saveLocation(SavedLocation("Mecca", 21.4225, 39.8262, 1L))
-        storage.saveCurrentLocation(
-            com.example.prayernotifier.data.location.CurrentLocation("Mecca", 21.4225, 39.8262)
-        )
-        val cache = RoomPrayerTimesCache(db.prayerDayDao())
-        val days = listOf(-1, 0, 1).map { offset ->
-            val date = today.plusDays(offset.toLong())
-            com.example.prayernotifier.data.PrayerDay(
-                timings = PrayerTimings("05:12", "12:45", "16:10", "18:52", "20:20"),
-                hijri = com.example.prayernotifier.data.HijriDate("d", "1", "M", "1448"),
-                readableDate = date.format(readable)
-            )
-        }
-        cache.save(days, today.year, today.monthValue, 21.4225, 39.8262)
-    }
-
-    @Test fun `day change re-plans today from the database`() = runTest {
-        seedToday()
+    @Test fun `day change re-plans today with times calculated for the place`() = runTest {
+        storage.saveCurrentLocation(mecca)
 
         assertTrue(handler.onDayChanged())
 
         assertEquals(1, scheduler.calls.size)
         val call = scheduler.calls[0]
         assertEquals(today, call.first)
-        assertEquals("05:12", call.second.fajr)
-        assertEquals("18:52", call.second.maghrib)
+        assertEquals(expected(CalculationMethod.UMM_AL_QURA), call.second)
     }
 
-    @Test fun `day change with empty database plans nothing`() = runTest {
-        storage.saveCurrentLocation(
-            com.example.prayernotifier.data.location.CurrentLocation("Mecca", 21.4225, 39.8262)
-        )
+    @Test fun `day change uses the method the user picked`() = runTest {
+        storage.saveCurrentLocation(mecca)
+        settingsStore.save(AppSettings(calculationMethod = CalculationMethod.EGYPT.name))
 
-        assertFalse(handler.onDayChanged())
-        assertTrue(scheduler.calls.isEmpty())
+        assertTrue(handler.onDayChanged())
+
+        assertEquals(expected(CalculationMethod.EGYPT), scheduler.calls.single().second)
     }
 
     @Test fun `day change without saved place plans nothing`() = runTest {
@@ -144,7 +112,12 @@ class PrayerAlarmHandlerTest {
     }
 
     private class FakeGeocode : GeocodeProvider {
-        override suspend fun placeName(latitude: Double, longitude: Double): String? = "Mecca"
+        override suspend fun lookup(latitude: Double, longitude: Double) = GeocodedPlace("Mecca", "SA")
+    }
+
+    private class FakeRegion : DeviceRegion {
+        override fun countryCode(): String? = null
+        override fun timeZone(): String = "Asia/Riyadh"
     }
 
     private class FakeScheduler : NotificationScheduler {

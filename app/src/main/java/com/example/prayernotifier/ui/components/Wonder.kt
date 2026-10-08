@@ -1,8 +1,6 @@
 package com.example.prayernotifier.ui.components
 
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,10 +20,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,7 +46,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.prayernotifier.R
@@ -457,39 +452,6 @@ fun WonderChip(
                 maxLines = 1
             )
         }
-    }
-}
-
-//endregion
-
-//region Offline download progress — one look on every screen.
-
-/** Animated bar plus "12 / 118 months"; progress glides instead of jumping. */
-@Composable
-fun OfflineProgress(done: Int, total: Int, modifier: Modifier = Modifier) {
-    val fraction by animateFloatAsState(
-        targetValue = if (total > 0) done / total.toFloat() else 0f,
-        animationSpec = tween(400),
-        label = "offline-progress"
-    )
-    Column(modifier.fillMaxWidth()) {
-        LinearProgressIndicator(
-            progress = { fraction },
-            modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-            color = WonderAccent1,
-            trackColor = WonderBlack,
-            drawStopIndicator = {}
-        )
-        Spacer(Modifier.height(WonderSpacing.x8))
-        Text(
-            text = if (total > 0) {
-                stringResource(R.string.months_progress, done.toString(), total.toString())
-            } else {
-                stringResource(R.string.checking)
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = WonderAccent2
-        )
     }
 }
 

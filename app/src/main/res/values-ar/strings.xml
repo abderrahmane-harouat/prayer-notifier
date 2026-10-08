@@ -28,7 +28,6 @@
     <string name="back">رجوع</string>
     <string name="settings">الإعدادات</string>
     <string name="try_again">إعادة المحاولة</string>
-    <string name="offline">بدون اتصال</string>
     <string name="current_location">الموقع الحالي</string>
 
     <string name="cd_change_location">تغيير الموقع، %1$s</string>
@@ -49,9 +48,6 @@
     <string name="go_to_today">الذهاب إلى اليوم</string>
     <string name="pick_a_date">اختيار تاريخ</string>
     <string name="places">الأماكن</string>
-    <string name="save_offline">الحفظ دون اتصال</string>
-    <string name="saving_offline_data">جارٍ حفظ البيانات</string>
-    <string name="months_progress">%1$s / %2$s شهرًا</string>
 
     <string name="location_needed_title">الموقع مطلوب</string>
     <string name="location_needed_desc">اسمح بالوصول إلى الموقع لعرض مواقيت الصلاة في منطقتك.</string>
@@ -64,8 +60,6 @@
     <string name="turn_on_location">تفعيل الموقع</string>
     <string name="no_fix_title">تعذّر تحديد الموقع</string>
     <string name="no_fix_desc">لا توجد إشارة GPS حاليًا. في المحاكي، حدّد موقعًا من عناصر التحكم الإضافية (⋯ ← الموقع).</string>
-    <string name="no_saved_data_title">لا توجد بيانات محفوظة</string>
-    <string name="no_saved_data_desc">لا يوجد اتصال بالإنترنت ولم يُحفظ شيء لهذا الشهر بعد.</string>
     <string name="saved_places">الأماكن المحفوظة</string>
     <string name="something_wrong">حدث خطأ ما</string>
     <string name="unknown_error">خطأ غير معروف</string>
@@ -76,39 +70,15 @@
     <string name="notice_location_updated">تم تحديث الموقع · %1$s</string>
     <string name="notice_location_off">خدمة الموقع متوقفة في هذا الهاتف.</string>
     <string name="notice_no_fix">تعذّر تحديد موقعك. حاول بعد لحظات.</string>
-    <string name="notice_load_failed">تعذّر تحميل مواقيت الصلاة. تحقق من الاتصال.</string>
+    <string name="notice_load_failed">تعذّر حساب مواقيت الصلاة لهذا المكان.</string>
     <string name="notice_permission_locked">إذن الموقع متوقف لهذا التطبيق.</string>
-
-    <!-- Home: connection button -->
-    <string name="net_wifi">واي فاي</string>
-    <string name="net_cellular">بيانات الجوال</string>
-    <string name="net_ethernet">إيثرنت</string>
-    <string name="net_online">متصل</string>
-    <string name="checking">جارٍ التحقق…</string>
-    <string name="notice_connected">متصل · %1$s</string>
-    <string name="notice_server_unreachable">متصل عبر %1$s، لكن خادم المواقيت لا يستجيب.</string>
-    <string name="notice_offline">لا يوجد إنترنت. تُعرض المواقيت المحفوظة.</string>
-    <string name="internet_settings">الإعدادات</string>
-    <string name="cd_connection">الاتصال: %1$s. اضغط للتحقق.</string>
 
     <string name="no_saved_places">لا توجد أماكن محفوظة بعد.</string>
     <string name="place_n">المكان %1$s</string>
     <string name="use_current_location">استخدام الموقع الحالي</string>
 
-    <string name="save_offline_title">حفظ البيانات دون اتصال</string>
-    <string name="save_offline_desc">نزّل مواقيت الصلاة لعشر سنوات ليعمل التطبيق دون إنترنت. يستغرق ذلك بضع دقائق.</string>
-    <string name="download_now">التنزيل الآن</string>
-    <string name="later">لاحقًا</string>
-    <string name="offline_all_saved_desc">كل شيء محفوظ لهذا المكان. يعمل التطبيق دون إنترنت.</string>
-    <string name="download_remaining">تنزيل الباقي</string>
-    <string name="done">تم</string>
-    <string name="notice_offline_saved">حُفظت البيانات دون اتصال لـ%1$s.</string>
-    <string name="notice_offline_partial">حُفظت البيانات، لكن تعذّر تنزيل %1$s من الأشهر. أعد المحاولة للإكمال.</string>
-    <string name="hide">إخفاء</string>
-
     <string name="section_prayer_times">مواقيت الصلاة</string>
     <string name="section_notifications">التنبيهات</string>
-    <string name="section_offline">البيانات دون اتصال</string>
     <string name="section_language">اللغة</string>
     <!-- Settings: grouped prayer rows -->
     <string name="before_every_prayer">قبل كل صلاة</string>
@@ -162,16 +132,37 @@
     <string name="permission_needed">تحتاج تذكيرات الصلاة إلى إذن من النظام.</string>
     <string name="enable">تفعيل</string>
 
-    <string name="location_label">الموقع</string>
-    <string name="no_location_yet">لم يُحدَّد موقع بعد</string>
-    <string name="saved_label">المحفوظ</string>
-    <string name="nothing_saved">لم يُحفظ شيء بعد</string>
-    <string name="full_offline_saved">حُفظت جميع البيانات</string>
-    <string name="months_saved">حُفظ %1$s من %2$s شهرًا</string>
-    <string name="range_label">المدة</string>
-    <string name="works_offline">يعمل دون إنترنت بعد الحفظ.</string>
-    <string name="attribution">مواقيت الصلاة من Aladhan</string>
+    <string name="attribution">تُحسب مواقيت الصلاة على هاتفك بمكتبة Adhan</string>
     <string name="attribution_font">الخط العربي: ثمانية</string>
+
+    <!-- Settings: calculation method -->
+    <string name="calculation_method">طريقة الحساب</string>
+    <string name="method_automatic">تلقائي</string>
+    <string name="method_automatic_value">%1$s · تلقائي</string>
+    <string name="method_automatic_desc">حسب بلد موقعك: %1$s</string>
+    <string name="method_sheet_desc">تُحسب مواقيت الصلاة على هاتفك. اختر الطريقة التي يتبعها مسجدك، أو دع التطبيق يختار حسب البلد.</string>
+    <string name="method_angles">الفجر %1$s° · العشاء %2$s°</string>
+    <string name="method_angles_interval">الفجر %1$s° · العشاء بعد المغرب بـ%2$s دقيقة</string>
+    <string name="method_mwl">رابطة العالم الإسلامي</string>
+    <string name="method_egypt">مصر</string>
+    <string name="method_umm_al_qura">أم القرى، مكة المكرمة</string>
+    <string name="method_karachi">كراتشي</string>
+    <string name="method_north_america">أمريكا الشمالية (ISNA)</string>
+    <string name="method_algeria">الجزائر</string>
+    <string name="method_morocco">المغرب</string>
+    <string name="method_tunisia">تونس</string>
+    <string name="method_jordan">الأردن</string>
+    <string name="method_dubai">دبي</string>
+    <string name="method_qatar">قطر</string>
+    <string name="method_kuwait">الكويت</string>
+    <string name="method_turkey">تركيا (ديانت)</string>
+    <string name="method_tehran">طهران</string>
+    <string name="method_russia">روسيا</string>
+    <string name="method_france">فرنسا (UOIF)</string>
+    <string name="method_portugal">البرتغال (لشبونة)</string>
+    <string name="method_singapore">سنغافورة</string>
+    <string name="method_malaysia">ماليزيا (جاكيم)</string>
+    <string name="method_indonesia">إندونيسيا (كيميناغ)</string>
 
     <string name="app_language">لغة التطبيق</string>
     <string name="language_system">لغة النظام</string>

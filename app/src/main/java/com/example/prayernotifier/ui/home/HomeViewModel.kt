@@ -2,16 +2,14 @@ package com.example.prayernotifier.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.prayernotifier.data.PrayerDataException
 import com.example.prayernotifier.data.PrayerDay
 import com.example.prayernotifier.data.UiGraph
-import com.example.prayernotifier.data.connectivity.NetworkKind
-import com.example.prayernotifier.data.connectivity.canReachPrayerServer
 import com.example.prayernotifier.data.location.CurrentLocation
 import com.example.prayernotifier.data.location.LocationException
 import com.example.prayernotifier.data.location.SavedLocation
 import com.example.prayernotifier.data.persistence.AppSettings
 import java.time.LocalDate
+import java.time.YearMonth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,7 +20,6 @@ import kotlinx.coroutines.withContext
 
 sealed interface HomeError {
     data class LocationRequired(val cause: LocationCause) : HomeError
-    data object OfflineNoData : HomeError
     data class LoadFailed(val message: String) : HomeError
 }
 
@@ -45,19 +42,12 @@ sealed interface HomeNotice {
     data class LocationUpdated(val name: String) : HomeNotice
     data class LocationFailed(val cause: LocationCause) : HomeNotice
     data object LoadFailed : HomeNotice
-    data class Connected(val kind: NetworkKind) : HomeNotice
-    /** A network is up, but the prayer-times server doesn't answer. */
-    data class ServerUnreachable(val kind: NetworkKind) : HomeNotice
-    data object Offline : HomeNotice
 }
 
 data class HomeUiState(
     val loading: Boolean = true,
     /** Blank until named; the UI shows a localized "Current location". */
     val locationName: String = "",
-    val isOnline: Boolean = true,
-    val network: NetworkKind = NetworkKind.Other,
-    val checkingConnection: Boolean = false,
     val days: List<PrayerDay> = emptyList(),
     val selectedDate: LocalDate = LocalDate.now(),
     val settings: AppSettings = AppSettings(),
@@ -76,16 +66,7 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
     private var current: CurrentLocation? = null
 
     init {
-        viewModelScope.launch {
-            graph.connectivity.kind.collect { kind ->
-                val cameBack = _state.value.network == NetworkKind.None && kind != NetworkKind.None
-                _state.update { it.copy(isOnline = kind != NetworkKind.None, network = kind) }
-                // Back online after an offline failure: load again by itself.
-                if (cameBack && _state.value.error != null) start()
-            }
-        }
         start()
-        graph.offline.refresh()
     }
 
     fun start() {
@@ -100,6 +81,9 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
                 current = cached
                 _state.update { it.copy(locationName = cached.name) }
                 loadMonth(itSelected())
+                // Saved by a version that didn't record the place's time zone
+                // and country: a fresh fix records both.
+                if (cached.timeZone == null) obtainFreshLocation()
             } else {
                 obtainFreshLocation()
             }
@@ -167,27 +151,6 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
 
     fun consumeNotice() = _state.update { it.copy(notice = null) }
 
-    /**
-     * The header's connection button: re-read the network, then really try
-     * the prayer-times server over it. Reloads when that works and the
-     * screen was showing an error.
-     */
-    fun checkConnection() {
-        if (_state.value.checkingConnection) return
-        viewModelScope.launch {
-            _state.update { it.copy(checkingConnection = true) }
-            val online = withContext(Dispatchers.IO) { graph.connectivity.refresh() }
-            val kind = graph.connectivity.kind.value
-            val notice = when {
-                !online -> HomeNotice.Offline
-                canReachPrayerServer() -> HomeNotice.Connected(kind)
-                else -> HomeNotice.ServerUnreachable(kind)
-            }
-            _state.update { it.copy(checkingConnection = false, notice = notice) }
-            if (notice is HomeNotice.Connected && _state.value.error != null) start()
-        }
-    }
-
     fun selectSavedLocation(location: SavedLocation) {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
@@ -195,7 +158,6 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
                 graph.locationService.selectSavedLocation(location)
             }
             current = updated
-            graph.offline.refresh()
             _state.update {
                 it.copy(locationName = updated.name, selectedDate = LocalDate.now())
             }
@@ -212,10 +174,13 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
         }
     }
 
+    /** A new calculation method changes the times themselves: recalculate. */
     fun refreshSettings() {
         viewModelScope.launch {
             val settings = withContext(Dispatchers.IO) { graph.settingsStore.load() }
+            val methodChanged = settings.calculationMethod != _state.value.settings.calculationMethod
             _state.update { it.copy(settings = settings) }
+            if (methodChanged && current != null) loadMonth(itSelected())
         }
     }
 
@@ -243,7 +208,6 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
                 graph.locationService.refreshLocation()
             }
             current = fresh
-            graph.offline.refresh()
             _state.update {
                 it.copy(
                     locationName = fresh.name,
@@ -282,22 +246,12 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
         }
         _state.update { it.copy(loading = true, error = null) }
         try {
-            val days = withContext(Dispatchers.IO) {
-                graph.repository.getPrayerTimesForMonth(
-                    forDate.year, forDate.monthValue, loc.latitude, loc.longitude
-                )
+            val days = withContext(Dispatchers.Default) {
+                graph.prayerTimes.month(YearMonth.from(forDate), loc, _state.value.settings)
             }
             _state.update { it.copy(loading = false, days = days) }
             if (forDate == LocalDate.now()) {
                 withContext(Dispatchers.IO) { graph.rescheduleToday() }
-            }
-        } catch (e: PrayerDataException.OfflineNoCache) {
-            _state.update {
-                it.copy(
-                    loading = false,
-                    error = HomeError.OfflineNoData,
-                    notice = if (it.days.isNotEmpty()) HomeNotice.LoadFailed else it.notice
-                )
             }
         } catch (e: Exception) {
             _state.update {

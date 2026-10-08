@@ -136,11 +136,5 @@ class PrayerMathTest {
 
     //region hijri
 
-    @Test fun `hijri day offset adds`() {
-        assertEquals(10, PrayerMath.adjustedHijriDay("9", 1))
-        assertEquals(7, PrayerMath.adjustedHijriDay("9", -2))
-        assertEquals(9, PrayerMath.adjustedHijriDay("9", 0))
-    }
-
     //endregion
 }

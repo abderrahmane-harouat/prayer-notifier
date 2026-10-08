@@ -13,7 +13,6 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.EaseOutCubic
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,23 +32,19 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Snackbar
@@ -102,22 +97,17 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.prayernotifier.R
 import com.example.prayernotifier.data.LocalUiGraph
-import com.example.prayernotifier.data.OfflineResult
-import com.example.prayernotifier.data.OfflineState
 import com.example.prayernotifier.data.PrayerMath
 import com.example.prayernotifier.data.PrayerTimings
-import com.example.prayernotifier.data.connectivity.NetworkKind
+import com.example.prayernotifier.data.calculation.PrayerCalculator
 import com.example.prayernotifier.data.persistence.PrayerNotificationSettings
-import com.example.prayernotifier.i18n.hijriMonthIndex
 import com.example.prayernotifier.i18n.prayerNameRes
 import com.example.prayernotifier.ui.components.ArchShape
 import com.example.prayernotifier.ui.components.CircleButton
 import com.example.prayernotifier.ui.components.EyebrowLabel
 import com.example.prayernotifier.ui.components.MetaRow
-import com.example.prayernotifier.ui.components.OfflineProgress
 import com.example.prayernotifier.ui.components.OrnamentDivider
 import com.example.prayernotifier.ui.components.PrayerIllustration
-import com.example.prayernotifier.ui.components.WonderCard
 import com.example.prayernotifier.ui.components.WonderDivider
 import com.example.prayernotifier.ui.components.WonderEmptyState
 import com.example.prayernotifier.ui.components.WonderPrimaryButton
@@ -157,9 +147,6 @@ private val ARABIC_NAMES: Map<String, String> = mapOf(
     "Isha" to "العشاء"
 )
 
-private val READABLE: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)
-
 /** Room the floating header needs above the scrolling content. */
 private val HEADER_SPACE = 72.dp
 
@@ -173,8 +160,6 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
             HomeViewModel(graph) as T
     })
     val state by vm.state.collectAsState()
-    // The app-wide offline download, shared with Settings.
-    val offline by graph.offline.state.collectAsState()
 
     // Returning from the Settings page doesn't fire ON_RESUME — pick up
     // edited adjustments / reminders here instead.
@@ -285,7 +270,6 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
     }
     var showDatePicker by remember { mutableStateOf(false) }
     var showPlaces by remember { mutableStateOf(false) }
-    var showDownloadConfirm by remember { mutableStateOf(false) }
 
     // First run: ask for notifications (Android 13+) once the location step
     // is settled (times on screen, or an error the user can read), never on
@@ -310,8 +294,6 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
             else -> stringResource(R.string.try_again)
         }
         HomeNotice.LoadFailed -> stringResource(R.string.try_again)
-        HomeNotice.Offline -> stringResource(R.string.internet_settings)
-        is HomeNotice.ServerUnreachable -> stringResource(R.string.try_again)
         else -> null
     }
     LaunchedEffect(state.notice) {
@@ -330,46 +312,14 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
                     else -> requestLocation()
                 }
                 HomeNotice.LoadFailed -> vm.retry()
-                HomeNotice.Offline -> openInternetSettings(context)
-                is HomeNotice.ServerUnreachable -> vm.checkConnection()
                 else -> Unit
             }
         }
     }
 
-    // Offline download finished (started here or in Settings): say how it went,
-    // once, whenever Home is the visible page.
-    val offlineMessage = when (val r = offline.result) {
-        OfflineResult.Complete -> stringResource(
-            R.string.notice_offline_saved,
-            offline.place?.name?.ifBlank { null } ?: stringResource(R.string.current_location)
-        )
-        is OfflineResult.Partial -> stringResource(R.string.notice_offline_partial, r.failed.toString())
-        OfflineResult.NoInternet -> stringResource(R.string.notice_offline)
-        null -> null
-    }
-    val offlineAction = if (offline.result is OfflineResult.Partial) stringResource(R.string.try_again) else null
-    LaunchedEffect(offline.result, visible) {
-        val result = offline.result ?: return@LaunchedEffect
-        if (!visible) return@LaunchedEffect
-        val answer = snackbar.showSnackbar(
-            message = offlineMessage.orEmpty(),
-            actionLabel = offlineAction,
-            duration = SnackbarDuration.Short
-        )
-        // Only after it was shown: clearing it earlier changes this effect's
-        // key and cancels the message before it appears.
-        graph.offline.consumeResult()
-        if (answer == SnackbarResult.ActionPerformed && result is OfflineResult.Partial) {
-            graph.offline.start()
-        }
-    }
-
     val today = LocalDate.now()
     val isToday = state.selectedDate == today
-    val day = state.days.firstOrNull {
-        it.readableDate == state.selectedDate.format(READABLE)
-    }
+    val day = state.days.firstOrNull { it.date == state.selectedDate }
 
     Box(Modifier.fillMaxSize()) {
         when {
@@ -380,8 +330,7 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
                     onShareLocation = { requestLocation() },
                     onOpenAppSettings = { openAppSettings(context) },
                     onOpenLocationSettings = { turnOnLocation() },
-                    onRetry = { vm.retry() },
-                    onPlaces = { vm.loadSavedLocations(); showPlaces = true }
+                    onRetry = { vm.retry() }
                 )
             day == null -> LoadingState()
             else -> HomeContent(
@@ -389,19 +338,13 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
                 isToday = isToday,
                 onToday = { vm.goToToday() },
                 onPickDate = { showDatePicker = true },
-                onPlaces = { vm.loadSavedLocations(); showPlaces = true },
-                onDownload = { graph.offline.refresh(); showDownloadConfirm = true }
+                onPlaces = { vm.loadSavedLocations(); showPlaces = true }
             )
         }
 
         // Floating circles over the art, Wonderous-style — declared after the
         // content so they stay on top; never inside the scrolling list.
-        FloatingHeader(
-            network = state.network,
-            checking = state.checkingConnection,
-            onMenu = onOpenSettings,
-            onCheckConnection = { vm.checkConnection() }
-        )
+        FloatingHeader(onMenu = onOpenSettings)
 
         // Notices float above the bottom bar, Wonderous-styled.
         SnackbarHost(
@@ -416,7 +359,9 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = state.selectedDate
                 .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            yearRange = 2020..2030
+            // Times are calculated, so any year works; the Hijri calendar
+            // covers about 1882 to 2174.
+            yearRange = 1900..2100
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -451,30 +396,11 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
         }
     }
 
-    if (showDownloadConfirm) {
-        OfflineDataDialog(
-            offline = offline,
-            fallbackPlace = state.locationName,
-            onDismiss = { showDownloadConfirm = false },
-            onConfirm = { graph.offline.start() }
-        )
-    }
 }
 
-/**
- * Menu circle top-left, connection button top-right; no bar surface. The
- * place name already sits under the hero and places live in the bottom
- * bar, so the corner shows how the phone is connected instead.
- */
+/** Menu circle top-left over the art; no bar surface. */
 @Composable
-private fun FloatingHeader(
-    network: NetworkKind,
-    checking: Boolean,
-    onMenu: () -> Unit,
-    onCheckConnection: () -> Unit
-) {
-    val label = if (checking) stringResource(R.string.checking) else networkLabel(network)
-    val description = stringResource(R.string.cd_connection, networkLabel(network))
+private fun FloatingHeader(onMenu: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -486,64 +412,7 @@ private fun FloatingHeader(
             contentDescription = stringResource(R.string.settings),
             onClick = onMenu
         )
-        Spacer(Modifier.weight(1f))
-        Surface(
-            onClick = onCheckConnection,
-            modifier = Modifier
-                .heightIn(min = 48.dp)
-                .semantics { contentDescription = description },
-            shape = RoundedCornerShape(WonderCorners.card),
-            color = WonderGreyStrong.copy(alpha = 0.92f)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = WonderSpacing.x16, vertical = WonderSpacing.x12),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (checking) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = WonderAccent1
-                    )
-                } else {
-                    Icon(
-                        painter = painterResource(networkIcon(network)),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        // Offline is the one state worth the accent.
-                        tint = if (network == NetworkKind.None) WonderAccent1 else WonderOffWhite
-                    )
-                }
-                Spacer(Modifier.width(WonderSpacing.x8))
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = WonderOffWhite,
-                    maxLines = 1
-                )
-            }
-        }
     }
-}
-
-@Composable
-private fun networkLabel(kind: NetworkKind): String = stringResource(
-    when (kind) {
-        NetworkKind.Wifi -> R.string.net_wifi
-        NetworkKind.Cellular -> R.string.net_cellular
-        NetworkKind.Ethernet -> R.string.net_ethernet
-        NetworkKind.Other -> R.string.net_online
-        NetworkKind.None -> R.string.offline
-    }
-)
-
-@DrawableRes
-private fun networkIcon(kind: NetworkKind): Int = when (kind) {
-    NetworkKind.Wifi -> R.drawable.ph_wifi_high_light
-    NetworkKind.Cellular -> R.drawable.ph_cell_signal_full_light
-    NetworkKind.Ethernet -> R.drawable.ph_network_light
-    NetworkKind.Other -> R.drawable.ph_globe_simple_light
-    NetworkKind.None -> R.drawable.ph_cloud_slash_light
 }
 
 @Composable
@@ -559,8 +428,7 @@ private fun HomeErrorState(
     onShareLocation: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onOpenLocationSettings: () -> Unit,
-    onRetry: () -> Unit,
-    onPlaces: () -> Unit
+    onRetry: () -> Unit
 ) {
     Column(
         Modifier
@@ -611,16 +479,6 @@ private fun HomeErrorState(
                     WonderPrimaryButton(text = stringResource(R.string.try_again), onClick = onShareLocation)
                 }
             }
-            HomeError.OfflineNoData -> {
-                WonderEmptyState(
-                    title = stringResource(R.string.no_saved_data_title),
-                    description = stringResource(R.string.no_saved_data_desc)
-                )
-                Spacer(Modifier.height(WonderSpacing.x32))
-                WonderPrimaryButton(text = stringResource(R.string.try_again), onClick = onRetry)
-                Spacer(Modifier.height(WonderSpacing.x8))
-                WonderTextButton(text = stringResource(R.string.saved_places), onClick = onPlaces)
-            }
             is HomeError.LoadFailed -> {
                 WonderEmptyState(
                     title = stringResource(R.string.something_wrong),
@@ -640,13 +498,10 @@ private fun HomeContent(
     isToday: Boolean,
     onToday: () -> Unit,
     onPickDate: () -> Unit,
-    onPlaces: () -> Unit,
-    onDownload: () -> Unit
+    onPlaces: () -> Unit
 ) {
     val state by vm.state.collectAsState()
-    val day = state.days.firstOrNull {
-        it.readableDate == state.selectedDate.format(READABLE)
-    } ?: return
+    val day = state.days.firstOrNull { it.date == state.selectedDate } ?: return
     val adjustments = state.settings.timeAdjustments
 
     // 1s ticker for the countdown — recomputes from PrayerMath each tick.
@@ -664,9 +519,9 @@ private fun HomeContent(
     val heroPrayer = countdown?.nextPrayer ?: "Isha"
     val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ENGLISH
     val isArabic = locale.language == "ar"
-    val monthIndex = hijriMonthIndex(day.hijri.monthEn)
-    val monthName = if (monthIndex >= 0) stringArrayResource(R.array.hijri_months)[monthIndex] else day.hijri.monthEn
-    val hijri = hijriLine(day.hijri.day, monthName, day.hijri.year, state.settings.hijriDateAdjustment)
+    val hijriDate = PrayerCalculator.hijri(state.selectedDate, state.settings.hijriDateAdjustment)
+    val hijriMonths = stringArrayResource(R.array.hijri_months)
+    val hijri = hijriDate?.let { "${it.day} ${hijriMonths[it.month - 1]} ${it.year}" }.orEmpty()
     val longDate = remember(locale) { DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", locale) }
 
     Column(Modifier.fillMaxSize()) {
@@ -744,19 +599,12 @@ private fun HomeContent(
       }
 
         // Fixed bottom bar, outside the scrolling list.
-        val offline by LocalUiGraph.current.offline.state.collectAsState()
         WonderActionBar(
-            downloadProgress = if (offline.running) {
-                if (offline.total > 0) offline.done / offline.total.toFloat() else 0f
-            } else {
-                null
-            },
             prayer = heroPrayer,
             isToday = isToday,
             onToday = onToday,
             onPickDate = onPickDate,
-            onPlaces = onPlaces,
-            onDownload = onDownload
+            onPlaces = onPlaces
         )
     }
 }
@@ -927,14 +775,11 @@ private fun PrayerEventCard(
  */
 @Composable
 private fun WonderActionBar(
-    /** 0..1 while the offline download runs, else null. */
-    downloadProgress: Float?,
     prayer: String,
     isToday: Boolean,
     onToday: () -> Unit,
     onPickDate: () -> Unit,
-    onPlaces: () -> Unit,
-    onDownload: () -> Unit
+    onPlaces: () -> Unit
 ) {
     val todayLabel = stringResource(R.string.today)
     Surface(
@@ -969,13 +814,6 @@ private fun WonderActionBar(
             ) {
                 BarIcon(R.drawable.ph_calendar_blank_light, stringResource(R.string.pick_a_date), active = !isToday, onClick = onPickDate)
                 BarIcon(R.drawable.ph_map_pin_light, stringResource(R.string.places), active = false, onClick = onPlaces)
-                BarIcon(
-                    R.drawable.ph_cloud_arrow_down_light,
-                    stringResource(R.string.save_offline),
-                    active = downloadProgress != null,
-                    onClick = onDownload,
-                    progress = downloadProgress
-                )
             }
         }
     }
@@ -986,22 +824,9 @@ private fun BarIcon(
     @DrawableRes icon: Int,
     label: String,
     active: Boolean,
-    onClick: () -> Unit,
-    progress: Float? = null
+    onClick: () -> Unit
 ) {
     IconButton(onClick = onClick, modifier = Modifier.size(56.dp)) {
-        if (progress != null) {
-            // A ring around the icon: the download is visible from anywhere on Home.
-            val ring by animateFloatAsState(progress, tween(400), label = "bar-progress")
-            CircularProgressIndicator(
-                progress = { ring },
-                modifier = Modifier.size(46.dp),
-                strokeWidth = 2.dp,
-                color = WonderAccent1,
-                trackColor = WonderBlack,
-                gapSize = 0.dp
-            )
-        }
         Icon(
             painter = painterResource(icon),
             contentDescription = label,
@@ -1060,122 +885,6 @@ private fun SavedPlacesSheet(
     }
 }
 
-/**
- * The cloud button's sheet of truth: what is saved offline for this place
- * (the same facts as Settings → Offline data), and a download action only
- * when something is actually missing.
- */
-@Composable
-private fun OfflineDataDialog(
-    offline: OfflineState,
-    fallbackPlace: String,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    val status = offline.status
-    val complete = status?.isCached == true
-    val partial = status != null && !complete && status.cachedMonths > 0
-    val place = offline.place?.name ?: fallbackPlace
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(WonderCorners.card),
-        containerColor = WonderGreyStrong,
-        title = {
-            Text(
-                text = stringResource(R.string.section_offline),
-                style = MaterialTheme.typography.headlineMedium,
-                color = WonderOffWhite
-            )
-        },
-        text = {
-            Column {
-                StatusLine(
-                    label = stringResource(R.string.location_label),
-                    value = place.ifBlank { stringResource(R.string.current_location) }
-                )
-                StatusLine(
-                    label = stringResource(R.string.saved_label),
-                    value = when {
-                        status == null -> stringResource(R.string.nothing_saved)
-                        complete -> stringResource(R.string.full_offline_saved)
-                        else -> stringResource(R.string.months_saved, status.cachedMonths.toString(), status.totalMonths.toString())
-                    },
-                    done = complete
-                )
-                if (status != null) {
-                    StatusLine(label = stringResource(R.string.range_label), value = status.yearsRange)
-                }
-                Spacer(Modifier.height(WonderSpacing.x8))
-                if (offline.running) {
-                    OfflineProgress(offline.done, offline.total)
-                } else {
-                    Text(
-                        text = stringResource(
-                            if (complete) R.string.offline_all_saved_desc else R.string.save_offline_desc
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = WonderAccent2
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Column(Modifier.fillMaxWidth()) {
-                when {
-                    // Downloading keeps going in the background; the ring on
-                    // the cloud icon and Settings show the same progress.
-                    offline.running -> WonderPrimaryButton(
-                        text = stringResource(R.string.hide),
-                        onClick = onDismiss,
-                        containerColor = WonderBlack
-                    )
-                    complete -> WonderPrimaryButton(
-                        text = stringResource(R.string.done),
-                        onClick = onDismiss,
-                        containerColor = WonderBlack
-                    )
-                    else -> {
-                        WonderPrimaryButton(
-                            text = stringResource(if (partial) R.string.download_remaining else R.string.download_now),
-                            onClick = onConfirm,
-                            containerColor = WonderBlack
-                        )
-                        Spacer(Modifier.height(WonderSpacing.x8))
-                        WonderTextButton(text = stringResource(R.string.later), onClick = onDismiss)
-                    }
-                }
-            }
-        }
-    )
-}
-
-/** Label over value, as in Settings' metadata rows, sized for a dialog. */
-@Composable
-private fun StatusLine(label: String, value: String, done: Boolean = false) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = WonderSpacing.x8),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = label.uppercase(),
-                style = MaterialTheme.typography.titleSmall,
-                color = WonderAccent2
-            )
-            Spacer(Modifier.height(WonderSpacing.x4))
-            Text(text = value, style = MaterialTheme.typography.bodyMedium, color = WonderOffWhite)
-        }
-        if (done) {
-            Icon(
-                painter = painterResource(R.drawable.ph_check_circle_light),
-                contentDescription = null,
-                modifier = Modifier.size(22.dp),
-                tint = WonderAccent1
-            )
-        }
-    }
-}
-
 /** Accent pill: the one place orange fills a control, because it's the way home. */
 @Composable
 private fun BackToTodayPill(onClick: () -> Unit) {
@@ -1230,10 +939,6 @@ private fun noticeMessage(notice: HomeNotice): String = when (notice) {
         }
     )
     HomeNotice.LoadFailed -> stringResource(R.string.notice_load_failed)
-    is HomeNotice.Connected -> stringResource(R.string.notice_connected, networkLabel(notice.kind))
-    is HomeNotice.ServerUnreachable ->
-        stringResource(R.string.notice_server_unreachable, networkLabel(notice.kind))
-    HomeNotice.Offline -> stringResource(R.string.notice_offline)
 }
 
 /** True exactly once per install, on Android 13+, while notifications are off. */
@@ -1300,25 +1005,10 @@ private fun openAppSettings(context: Context) {
     context.startActivity(intent)
 }
 
-/** Android 10+ shows the Internet panel (Wi-Fi + mobile data) in place. */
-private fun openInternetSettings(context: Context) {
-    val intent = if (android.os.Build.VERSION.SDK_INT >= 29) {
-        Intent(SystemSettings.Panel.ACTION_INTERNET_CONNECTIVITY)
-    } else {
-        Intent(SystemSettings.ACTION_WIRELESS_SETTINGS)
-    }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    context.startActivity(intent)
-}
-
 private fun openLocationSettings(context: Context) {
     val intent = Intent(SystemSettings.ACTION_LOCATION_SOURCE_SETTINGS)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     context.startActivity(intent)
-}
-
-private fun hijriLine(day: String, monthName: String, year: String, offset: Int): String {
-    val adjusted = PrayerMath.adjustedHijriDay(day, offset)
-    return "$adjusted $monthName $year"
 }
 
 private fun formatDuration(hours: Long, minutes: Int, seconds: Int): String {

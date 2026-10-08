@@ -2,7 +2,7 @@
 
 **English** · [العربية](README.ar.md)
 
-A prayer times notifier for Android that works offline for 10 years. It shows the five daily prayer times for where you are and sends a reminder before each prayer. Download once and it keeps working for 10 years without internet. Available in Arabic and English, with no ads, no analytics and no tracking.
+A prayer times notifier for Android that works fully offline. It shows the five daily prayer times for where you are and sends a reminder before each prayer. The times are calculated on your phone from the sun's position, so there is nothing to download and it works for any date, with or without internet. Available in Arabic and English, with no ads, no analytics and no tracking.
 
 <p>
   <img src="docs/screenshots/home_en.png" width="200" alt="Home screen: next prayer, countdown and today's prayers" />
@@ -17,8 +17,7 @@ A prayer times notifier for Android that works offline for 10 years. It shows th
 - **Countdown to the next prayer**, with the Hijri and Gregorian dates. Browse any other day, and go back to today with one tap.
 - **Reminders, not alarms**: a normal notification with a soft sound before each prayer, worded to match your setting ("5 minutes until Maghrib", or "Time for Maghrib prayer" when set to on time). Choose the lead time for all prayers at once (on time, 5, 10, 15 or 30 minutes), or per prayer, and turn any prayer on or off.
 - **Time corrections**: shift any prayer by up to ±30 minutes, and the Hijri date by ±2 days, to match your local mosque or moon sighting.
-- **Works offline**: download 10 years of prayer times for a place. With no internet the app uses what is saved.
-- **Connection status**: see whether you are on Wi-Fi, mobile data or offline, and tap to check that the prayer-times server is reachable.
+- **Calculated on your phone**: no internet needed, ever, and no date limit. The calculation method follows your country's official authority (for example Algeria's ministry in Algeria, Umm al-Qura in Saudi Arabia, Diyanet in Turkey), or pick another one in Settings to match your mosque.
 - **English and Arabic**: full right-to-left layout in Arabic. Pick the language in the app, or in Android's per-app language settings (Android 13+).
 - **A museum-book design**: warm dark tones, classical serif titles and a hand-drawn scene for each prayer, inspired by the [Wonderous](https://wonderous.app) app. An animated Alhambra splash plays on launch (Android 12+).
 
@@ -26,11 +25,12 @@ A prayer times notifier for Android that works offline for 10 years. It shows th
 
 | Part | Details |
 |---|---|
-| Prayer times | Monthly calendars from the free [Aladhan API](https://aladhan.com/prayer-times-api) (`/v1/calendar`) for your coordinates. No calculation method is set yet, so the API's default applies. |
-| Offline storage | Every month you view is saved in a local Room database. "Save offline" downloads the previous year plus the next 8 years (10 years, 120 months) and skips months already saved. |
+| Prayer times | Calculated on the device with the [Adhan](https://github.com/batoulapps/adhan-java) library from your coordinates and the date: Fajr and Isha from the sun's angle below the horizon, Dhuhr at solar noon, Asr when a shadow equals its object plus its noon shadow (Shafi'i, Maliki, Hanbali), Maghrib at sunset. Shown in the place's time zone. |
+| Calculation method | Chosen by the place's country (`data/calculation/CountryMethods.kt`): the country's own authority where there is one (Algeria, Morocco, Tunisia, Egypt, Umm al-Qura, UAE, Qatar, Kuwait, Jordan, Turkey, Iran, Pakistan, Russia, France, Portugal, Singapore, Malaysia, Indonesia, ISNA for the US and Canada), otherwise the region's usual method (Egyptian for Africa, Umm al-Qura for the Arabian Peninsula, Karachi for South Asia), otherwise Muslim World League. The angles and minute offsets match the [Aladhan API](https://aladhan.com/prayer-times-api) methods the app used before, and unit tests check the results against Aladhan within a minute. You can pick any method yourself in Settings. |
+| Country | From the geocoder when the location is taken; offline, from the mobile network's country or the phone's time zone. Never from the language setting. |
+| Hijri date | Android's built-in Umm al-Qura calendar, with your ±2 day correction. |
 | Reminders | Scheduled with `AlarmManager` as plain notifications (no alarm-clock UI, no full-screen alert). Exact timing when Android allows it; otherwise they still arrive, possibly a few minutes late. They are re-planned every night and after a reboot. |
 | Location | One GPS fix through the Fused Location Provider, named with Android's geocoder (or by its coordinates when no name is found). |
-| Connectivity | Wi-Fi, mobile data, Ethernet and VPN all count; networks stuck behind a login page (captive portal) count as offline. |
 
 ### Permissions
 
@@ -39,10 +39,9 @@ A prayer times notifier for Android that works offline for 10 years. It shows th
 | Location (while using the app) | Prayer times depend on where you are. Asked on first launch. |
 | Notifications (Android 13+) | To show prayer reminders. Asked once the prayer times are on screen. |
 | Exact alarms (`USE_EXACT_ALARM`, and `SCHEDULE_EXACT_ALARM` on Android 12) | Granted automatically, so reminders arrive on the minute. Never shown to you as an "alarms" permission screen. |
-| Internet / network state | To download prayer times and show the connection status. |
 | Run at startup | To re-plan reminders after the phone restarts. |
 
-The app has no accounts, analytics, ads or tracking. Your coordinates are sent only to the Aladhan API (to get prayer times) and to Android's built-in geocoder (to name the place).
+The app has no accounts, analytics, ads or tracking, and no internet permission. Your coordinates go only to Android's built-in geocoder (to name the place and find its country).
 
 ## Build and run
 
@@ -116,9 +115,10 @@ To build with Thmanyah:
 ```
 app/src/main/java/com/example/prayernotifier/
 ├── MainActivity.kt          # edge-to-edge, splash animation, language restore
-├── data/                    # Aladhan API, Room cache, location, settings, connectivity
+├── data/                    # prayer times, location, settings
+│   ├── calculation/         # on-device calculation, methods, country → method table
 │   └── notifications/       # reminder scheduling, alarm receiver, notifications
-├── i18n/                    # app language switching, Hijri month names
+├── i18n/                    # app language switching, prayer and method names
 └── ui/
     ├── AppShell.kt          # Home ↔ Settings with animated page transitions
     ├── home/                # Home screen and its ViewModel
@@ -134,7 +134,7 @@ archive/                     # the original Flutter version of the app (not main
 
 ## Credits
 
-- Prayer times: [Aladhan API](https://aladhan.com/prayer-times-api)
+- Prayer time calculation: [Adhan](https://github.com/batoulapps/adhan-java) by Batoul Apps (MIT, license in `app/src/main/assets/licenses/`); method parameters from the [Aladhan API](https://aladhan.com/prayer-times-api)
 - Design inspiration: [Wonderous](https://wonderous.app) by gskinner
 - Icons: [Phosphor Icons](https://phosphoricons.com) (MIT, license in `app/src/main/assets/licenses/`)
 - Fonts (SIL Open Font License, licenses in `app/src/main/assets/licenses/`): [Yeseva One](https://fonts.google.com/specimen/Yeseva+One), [Tenor Sans](https://fonts.google.com/specimen/Tenor+Sans), [Raleway](https://fonts.google.com/specimen/Raleway), [Amiri](https://fonts.google.com/specimen/Amiri)

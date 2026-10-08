@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.prayernotifier.data.PrayerMath
 import com.example.prayernotifier.data.UiGraph
+import com.example.prayernotifier.data.calculation.CalculationMethod
 import com.example.prayernotifier.data.persistence.AppSettings
 import com.example.prayernotifier.data.persistence.PrayerNotificationSettings
 import com.example.prayernotifier.data.persistence.PrayerTimeAdjustments
@@ -18,8 +19,13 @@ import kotlinx.coroutines.withContext
 data class SettingsUiState(
     val loading: Boolean = true,
     val settings: AppSettings = AppSettings(),
-    val notificationsAllowed: Boolean = true
-)
+    val notificationsAllowed: Boolean = true,
+    /** The method "automatic" picks for the current place's country. */
+    val automaticMethod: CalculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE
+) {
+    /** The method the times actually use. */
+    val method: CalculationMethod get() = settings.chosenMethod ?: automaticMethod
+}
 
 class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
     private val _state = MutableStateFlow(SettingsUiState())
@@ -33,7 +39,10 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             val settings = withContext(Dispatchers.IO) { graph.settingsStore.load() }
-            _state.update { it.copy(loading = false, settings = settings) }
+            val place = withContext(Dispatchers.IO) { graph.locationService.getCurrentSavedLocation() }
+            val automatic = place?.let { graph.prayerTimes.automaticMethodFor(it) }
+                ?: CalculationMethod.MUSLIM_WORLD_LEAGUE
+            _state.update { it.copy(loading = false, settings = settings, automaticMethod = automatic) }
         }
     }
 
@@ -49,6 +58,11 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
             }
             _state.update { it.copy(settings = next) }
         }
+    }
+
+    /** Null goes back to the method of the place's country. */
+    fun setMethod(method: CalculationMethod?) {
+        persist(_state.value.settings.copy(calculationMethod = method?.name))
     }
 
     fun setHijriOffset(days: Int) {

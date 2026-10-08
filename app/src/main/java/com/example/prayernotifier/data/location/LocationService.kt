@@ -8,7 +8,8 @@ package com.example.prayernotifier.data.location
 class LocationService(
     private val positions: PositionProvider,
     private val geocoder: GeocodeProvider,
-    private val storage: LocationStorage
+    private val storage: LocationStorage,
+    private val region: DeviceRegion
 ) {
     /** One-shot fix, or throws [LocationException]. Never returns null. */
     suspend fun determinePosition(): LatLng = when (val outcome = positions.currentFix()) {
@@ -18,29 +19,30 @@ class LocationService(
         PositionOutcome.NoFix -> throw LocationException.NoFix
     }
 
-    suspend fun getPlaceName(latitude: Double, longitude: Double): String? =
-        geocoder.placeName(latitude, longitude)
-
     /**
      * Full refresh: fix → reverse-geocode → persist current + cached name +
      * saved-list entry (same-area entries are updated, not duplicated).
      * When no place name resolves (offline geocoder, open sea) the fix is
-     * still saved under its coordinates, so the new location sticks.
+     * still saved under its coordinates, so the new location sticks. The
+     * country comes from the geocoder, or from the phone itself offline;
+     * the time zone is the phone's, since the phone is at the place.
      */
     suspend fun refreshLocation(nowEpochMs: Long = System.currentTimeMillis()): CurrentLocation {
         val pos = determinePosition()
-        val name = getPlaceName(pos.latitude, pos.longitude)
-            ?: coordinateLabel(pos.latitude, pos.longitude)
-        val current = CurrentLocation(name, pos.latitude, pos.longitude)
+        val place = geocoder.lookup(pos.latitude, pos.longitude)
+        val name = place?.name ?: coordinateLabel(pos.latitude, pos.longitude)
+        val country = place?.countryCode ?: region.countryCode()
+        val zone = region.timeZone()
+        val current = CurrentLocation(name, pos.latitude, pos.longitude, country, zone)
         storage.saveCurrentLocation(current)
         storage.cacheLocationName(name)
-        storage.saveLocation(SavedLocation(name, pos.latitude, pos.longitude, nowEpochMs))
+        storage.saveLocation(SavedLocation(name, pos.latitude, pos.longitude, nowEpochMs, country, zone))
         return current
     }
 
     /** Switch to a previously saved place (persists it as current). */
     suspend fun selectSavedLocation(value: SavedLocation): CurrentLocation {
-        val current = CurrentLocation(value.name, value.latitude, value.longitude)
+        val current = CurrentLocation(value.name, value.latitude, value.longitude, value.countryCode, value.timeZone)
         storage.saveCurrentLocation(current)
         storage.cacheLocationName(value.name)
         return current

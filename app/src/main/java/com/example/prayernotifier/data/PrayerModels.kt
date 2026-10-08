@@ -1,9 +1,8 @@
 package com.example.prayernotifier.data
 
-import kotlinx.serialization.Serializable
+import java.time.LocalDate
 
-/** Domain models — mirrors the Flutter app's `lib/models/prayer_times.dart`. */
-@Serializable
+/** The five prayer times of one day, "HH:mm" in the place's local time. */
 data class PrayerTimings(
     val fajr: String,
     val dhuhr: String,
@@ -12,17 +11,14 @@ data class PrayerTimings(
     val isha: String
 )
 
-@Serializable
+/** A day of the Umm al-Qura Hijri calendar; [month] runs 1 (Muharram) to 12. */
 data class HijriDate(
-    val date: String,
-    val day: String,
-    val monthEn: String,
-    val year: String
+    val day: Int,
+    val month: Int,
+    val year: Int
 )
 
-@Serializable
 data class PrayerDay(
-    val timings: PrayerTimings,
-    val hijri: HijriDate,
-    val readableDate: String
+    val date: LocalDate,
+    val timings: PrayerTimings
 )

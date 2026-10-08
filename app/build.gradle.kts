@@ -5,7 +5,6 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization") version "2.2.20"
-    id("com.google.devtools.ksp")
 }
 
 android {
@@ -99,21 +98,15 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
+    // Prayer times from the sun's position, on the device (MIT, no dependencies).
+    implementation("com.batoulapps.adhan:adhan:1.2.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
-    implementation("androidx.room:room-runtime:2.8.5")
-    implementation("androidx.room:room-ktx:2.8.5")
-    ksp("androidx.room:room-compiler:2.8.5")
-
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.test:core:1.6.1")
-    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("org.robolectric:robolectric:4.15.1")
 }

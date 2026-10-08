@@ -29,13 +29,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -73,16 +74,16 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.prayernotifier.R
 import com.example.prayernotifier.data.LocalUiGraph
-import com.example.prayernotifier.data.OfflineState
 import com.example.prayernotifier.data.PrayerMath
+import com.example.prayernotifier.data.calculation.CalculationMethod
 import com.example.prayernotifier.data.persistence.AppSettings
 import com.example.prayernotifier.data.persistence.PrayerNotificationSettings
 import com.example.prayernotifier.i18n.AppLanguage
+import com.example.prayernotifier.i18n.methodNameRes
 import com.example.prayernotifier.i18n.prayerNameRes
 import com.example.prayernotifier.ui.components.CircleButton
 import com.example.prayernotifier.ui.components.EyebrowLabel
 import com.example.prayernotifier.ui.components.MetaRow
-import com.example.prayernotifier.ui.components.OfflineProgress
 import com.example.prayernotifier.ui.components.OrnamentDivider
 import com.example.prayernotifier.ui.components.WonderCard
 import com.example.prayernotifier.ui.components.WonderChip
@@ -92,7 +93,6 @@ import com.example.prayernotifier.ui.components.WonderPrimaryButton
 import com.example.prayernotifier.ui.components.WonderTextButton
 import com.example.prayernotifier.ui.theme.WonderAccent1
 import com.example.prayernotifier.ui.theme.WonderAccent2
-import com.example.prayernotifier.ui.theme.WonderAccent3
 import com.example.prayernotifier.ui.theme.WonderBlack
 import com.example.prayernotifier.ui.theme.WonderCaption
 import com.example.prayernotifier.ui.theme.WonderCorners
@@ -105,6 +105,7 @@ import com.example.prayernotifier.ui.theme.thmanyahAvailable
 
 private sealed interface Sheet {
     data object Hijri : Sheet
+    data object Method : Sheet
     data class Prayer(val prayer: String) : Sheet
     data object Language : Sheet
 }
@@ -120,16 +121,11 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
             SettingsViewModel(graph) as T
     })
     val state by vm.state.collectAsState()
-    // The app-wide offline download, shared with Home.
-    val offline by graph.offline.state.collectAsState()
 
     // Both pages stay composed, so re-read everything each time Settings is
-    // opened: changes made on Home (location, a finished download) show up.
+    // opened: changes made on Home (a new location) show up.
     LaunchedEffect(visible) {
-        if (visible) {
-            vm.refresh()
-            graph.offline.refresh()
-        }
+        if (visible) vm.refresh()
     }
     var sheet by remember { mutableStateOf<Sheet?>(null) }
 
@@ -227,6 +223,21 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                 }
 
                 item {
+                    SectionEyebrow(stringResource(R.string.section_prayer_times))
+                    WonderCard {
+                        MetaRow(
+                            label = stringResource(R.string.calculation_method),
+                            value = if (state.settings.chosenMethod == null) {
+                                stringResource(R.string.method_automatic_value, stringResource(methodNameRes(state.method)))
+                            } else {
+                                stringResource(methodNameRes(state.method))
+                            },
+                            onClick = { sheet = Sheet.Method }
+                        )
+                    }
+                }
+
+                item {
                     SectionEyebrow(stringResource(R.string.section_calendar))
                     WonderCard {
                         MetaRow(
@@ -246,14 +257,6 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                             onClick = { sheet = Sheet.Language }
                         )
                     }
-                }
-
-                item {
-                    SectionEyebrow(stringResource(R.string.section_offline))
-                    OfflineCard(
-                        offline = offline,
-                        onDownload = { graph.offline.start() }
-                    )
                 }
 
                 item {
@@ -301,6 +304,11 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     valueLabel = { offsetLabel(it, days = true) },
                     onSave = { vm.setHijriOffset(it); sheet = null },
                     onCancel = { sheet = null }
+                )
+                Sheet.Method -> MethodSheet(
+                    chosen = state.settings.chosenMethod,
+                    automatic = state.automaticMethod,
+                    onSelect = { vm.setMethod(it); sheet = null }
                 )
                 is Sheet.Prayer -> PrayerSheet(
                     prayer = current.prayer,
@@ -565,71 +573,86 @@ private fun PrayerRow(
     }
 }
 
+/**
+ * Automatic first (the method of the place's country, named), then every
+ * method by name with its angles, for matching a local mosque.
+ */
 @Composable
-private fun OfflineCard(offline: OfflineState, onDownload: () -> Unit) {
-    val status = offline.status
-    val complete = status?.isCached == true
-    val partial = status != null && !complete && status.cachedMonths > 0
-    WonderCard {
-        MetaRow(
-            label = stringResource(R.string.location_label),
-            value = when {
-                offline.place == null -> stringResource(R.string.no_location_yet)
-                offline.place.name.isBlank() -> stringResource(R.string.current_location)
-                else -> offline.place.name
-            }
+private fun MethodSheet(
+    chosen: CalculationMethod?,
+    automatic: CalculationMethod,
+    onSelect: (CalculationMethod?) -> Unit
+) {
+    SheetColumn(title = stringResource(R.string.calculation_method)) {
+        Text(
+            text = stringResource(R.string.method_sheet_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = WonderAccent2,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
-        WonderDivider()
-        MetaRow(
-            label = stringResource(R.string.saved_label),
-            value = when {
-                status == null -> stringResource(R.string.nothing_saved)
-                complete -> stringResource(R.string.full_offline_saved)
-                else -> stringResource(R.string.months_saved, status.cachedMonths.toString(), status.totalMonths.toString())
-            },
-            trailingContent = if (complete) {
-                {
-                    Icon(
-                        painter = painterResource(R.drawable.ph_check_circle_light),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = WonderAccent1
-                    )
-                }
-            } else {
-                null
-            }
-        )
-        if (status != null) {
-            WonderDivider()
-            MetaRow(label = stringResource(R.string.range_label), value = status.yearsRange)
-        }
-        when {
-            // Same live progress as the cloud button on Home.
-            offline.running -> OfflineProgress(
-                done = offline.done,
-                total = offline.total,
-                modifier = Modifier.padding(horizontal = WonderSpacing.x24, vertical = WonderSpacing.x16)
+        Spacer(Modifier.height(WonderSpacing.x8))
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            MethodOption(
+                title = stringResource(R.string.method_automatic),
+                description = stringResource(R.string.method_automatic_desc, stringResource(methodNameRes(automatic))),
+                selected = chosen == null,
+                onClick = { onSelect(null) }
             )
-            !complete && offline.place != null -> {
-                Text(
-                    text = stringResource(R.string.works_offline),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = WonderCaption,
-                    modifier = Modifier.padding(horizontal = WonderSpacing.x24, vertical = WonderSpacing.x8)
-                )
-                WonderPrimaryButton(
-                    text = stringResource(if (partial) R.string.download_remaining else R.string.save_offline_title),
-                    onClick = onDownload,
-                    containerColor = WonderBlack,
-                    modifier = Modifier.padding(
-                        start = WonderSpacing.x16,
-                        end = WonderSpacing.x16,
-                        bottom = WonderSpacing.x16
-                    )
+            CalculationMethod.entries.forEach { method ->
+                HorizontalDivider(thickness = 1.dp, color = WonderBlack)
+                MethodOption(
+                    title = stringResource(methodNameRes(method)),
+                    description = methodAngles(method),
+                    selected = chosen == method,
+                    onClick = { onSelect(method) }
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun MethodOption(title: String, description: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(WonderCorners.card))
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = WonderSpacing.x8, vertical = WonderSpacing.x12),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (selected) WonderAccent1 else WonderOffWhite
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = WonderAccent2
+            )
+        }
+        if (selected) {
+            Icon(
+                painter = painterResource(R.drawable.ph_check_light),
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = WonderAccent1
+            )
+        }
+    }
+}
+
+/** "Fajr 18° · Isha 17°", or Isha as minutes after Maghrib. */
+@Composable
+private fun methodAngles(method: CalculationMethod): String {
+    fun degrees(value: Double) = if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
+    return if (method.ishaMinutes > 0) {
+        stringResource(R.string.method_angles_interval, degrees(method.fajrAngle), method.ishaMinutes.toString())
+    } else {
+        stringResource(R.string.method_angles, degrees(method.fajrAngle), degrees(method.ishaAngle))
     }
 }
 

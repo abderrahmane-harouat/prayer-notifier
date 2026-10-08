@@ -2,13 +2,14 @@ package com.example.prayernotifier.data.notifications
 
 import android.content.Context
 import com.example.prayernotifier.R
+import com.example.prayernotifier.data.PrayerTimesRepository
+import com.example.prayernotifier.data.location.AndroidDeviceRegion
 import com.example.prayernotifier.data.location.AndroidGeocoderProvider
 import com.example.prayernotifier.data.location.FusedPositionProvider
 import com.example.prayernotifier.data.location.LocationService
 import com.example.prayernotifier.data.location.PrefsLocationStorage
 import com.example.prayernotifier.data.persistence.PrefsKeyValueStore
 import com.example.prayernotifier.data.persistence.SettingsStore
-import com.example.prayernotifier.data.persistence.prayerDatabase
 import com.example.prayernotifier.i18n.AppLanguage
 import com.example.prayernotifier.i18n.prayerNameRes
 
@@ -16,24 +17,23 @@ import com.example.prayernotifier.i18n.prayerNameRes
 class AppGraph(context: Context) {
     private val app = context.applicationContext
 
-    private val database by lazy { prayerDatabase(app) }
+    private val region by lazy { AndroidDeviceRegion(app) }
     private val locationService by lazy {
         LocationService(
             FusedPositionProvider(app),
             AndroidGeocoderProvider(app),
-            PrefsLocationStorage(app)
+            PrefsLocationStorage(app),
+            region
         )
     }
-    private val cache by lazy {
-        com.example.prayernotifier.data.persistence.RoomPrayerTimesCache(database.prayerDayDao())
-    }
+    private val prayerTimes by lazy { PrayerTimesRepository(deviceCountry = region::countryCode) }
     private val settings by lazy { SettingsStore(PrefsKeyValueStore(app, "prayer_notifier_settings")) }
     private val scheduler by lazy { ExactAlarmScheduler(app, RealAlarmOps(app)) }
     private val notifier by lazy { SystemNotifier(app) }
 
     val handler by lazy {
         PrayerAlarmHandler(
-            locationService, cache, settings, scheduler, notifier,
+            locationService, prayerTimes, settings, scheduler, notifier,
             texts = LocalizedNotificationTexts(app)
         )
     }

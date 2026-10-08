@@ -5,9 +5,22 @@ interface PositionProvider {
     suspend fun currentFix(): PositionOutcome
 }
 
-/** Reverse-geocodes coords to a display name. Returns null when unavailable. */
+/** What reverse geocoding found; either part may be missing. */
+data class GeocodedPlace(val name: String?, val countryCode: String?)
+
+/** Reverse-geocodes coords. Returns null when unavailable (often offline). */
 interface GeocodeProvider {
-    suspend fun placeName(latitude: Double, longitude: Double): String?
+    suspend fun lookup(latitude: Double, longitude: Double): GeocodedPlace?
+}
+
+/**
+ * Where the phone itself is, known without the internet: the country of
+ * the mobile network or, failing that, of the time zone. Valid for a fresh
+ * GPS fix only, since the phone is then at the place.
+ */
+interface DeviceRegion {
+    fun countryCode(): String?
+    fun timeZone(): String
 }
 
 /**

@@ -76,7 +76,4 @@ object PrayerMath {
         val tomorrowFajr = dateTimeFor(timings, adjustments, "Fajr", now.toLocalDate().plusDays(1))
         return Countdown("Fajr", Duration.between(now, tomorrowFajr))
     }
-
-    /** Applies the user's Hijri day correction to a Hijri day number. */
-    fun adjustedHijriDay(day: String, offsetDays: Int): Int = day.toInt() + offsetDays
 }

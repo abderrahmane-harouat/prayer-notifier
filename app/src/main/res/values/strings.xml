@@ -31,7 +31,6 @@
     <string name="back">Back</string>
     <string name="settings">Settings</string>
     <string name="try_again">Try again</string>
-    <string name="offline">Offline</string>
     <string name="current_location">Current location</string>
 
     <!-- Home -->
@@ -49,9 +48,6 @@
     <string name="go_to_today">Go to today</string>
     <string name="pick_a_date">Pick a date</string>
     <string name="places">Places</string>
-    <string name="save_offline">Save offline</string>
-    <string name="saving_offline_data">Saving offline data</string>
-    <string name="months_progress">%1$s / %2$s months</string>
 
     <string name="location_needed_title">Location needed</string>
     <string name="location_needed_desc">Allow location access to load prayer times for your area.</string>
@@ -64,8 +60,6 @@
     <string name="turn_on_location">Turn on location</string>
     <string name="no_fix_title">Can\'t get a fix</string>
     <string name="no_fix_desc">No GPS fix right now. On an emulator, set a location in the extended controls (⋯ → Location).</string>
-    <string name="no_saved_data_title">No saved data</string>
-    <string name="no_saved_data_desc">There is no internet connection and nothing saved for this month yet.</string>
     <string name="saved_places">Saved places</string>
     <string name="something_wrong">Something went wrong</string>
     <string name="unknown_error">Unknown error</string>
@@ -76,40 +70,16 @@
     <string name="notice_location_updated">Location updated · %1$s</string>
     <string name="notice_location_off">Location is turned off on this phone.</string>
     <string name="notice_no_fix">Couldn\'t get your location. Try again in a moment.</string>
-    <string name="notice_load_failed">Couldn\'t load prayer times. Check your connection.</string>
+    <string name="notice_load_failed">Couldn\'t calculate prayer times for this place.</string>
     <string name="notice_permission_locked">Location permission is off for this app.</string>
-
-    <!-- Home: connection button -->
-    <string name="net_wifi">Wi-Fi</string>
-    <string name="net_cellular">Mobile data</string>
-    <string name="net_ethernet">Ethernet</string>
-    <string name="net_online">Online</string>
-    <string name="checking">Checking…</string>
-    <string name="notice_connected">Connected · %1$s</string>
-    <string name="notice_server_unreachable">On %1$s, but the prayer-times server isn\'t answering.</string>
-    <string name="notice_offline">No internet. Showing saved prayer times.</string>
-    <string name="internet_settings">Settings</string>
-    <string name="cd_connection">Connection: %1$s. Tap to check it.</string>
 
     <string name="no_saved_places">No saved places yet.</string>
     <string name="place_n">Place %1$s</string>
     <string name="use_current_location">Use current location</string>
 
-    <string name="save_offline_title">Save offline data</string>
-    <string name="save_offline_desc">Download prayer times for 10 years so the app works without internet. This takes a few minutes.</string>
-    <string name="download_now">Download now</string>
-    <string name="later">Later</string>
-    <string name="offline_all_saved_desc">Everything is saved for this place. The app works without internet.</string>
-    <string name="download_remaining">Download the rest</string>
-    <string name="done">Done</string>
-    <string name="notice_offline_saved">Offline data saved for %1$s.</string>
-    <string name="notice_offline_partial">Saved, but %1$s months couldn\'t be downloaded. Try again to finish.</string>
-    <string name="hide">Hide</string>
-
     <!-- Settings -->
     <string name="section_prayer_times">Prayer times</string>
     <string name="section_notifications">Notifications</string>
-    <string name="section_offline">Offline data</string>
     <string name="section_language">Language</string>
     <!-- Settings: grouped prayer rows -->
     <string name="before_every_prayer">Before every prayer</string>
@@ -151,16 +121,37 @@
     <string name="permission_needed">Prayer reminders need system permission.</string>
     <string name="enable">Enable</string>
 
-    <string name="location_label">Location</string>
-    <string name="no_location_yet">No location yet</string>
-    <string name="saved_label">Saved</string>
-    <string name="nothing_saved">Nothing saved yet</string>
-    <string name="full_offline_saved">Full offline data saved</string>
-    <string name="months_saved">%1$s of %2$s months saved</string>
-    <string name="range_label">Range</string>
-    <string name="works_offline">Works without internet once saved.</string>
-    <string name="attribution">Prayer times by Aladhan</string>
+    <string name="attribution">Prayer times calculated on your phone with Adhan</string>
     <string name="attribution_font">Arabic typeface: Thmanyah</string>
+
+    <!-- Settings: calculation method -->
+    <string name="calculation_method">Calculation method</string>
+    <string name="method_automatic">Automatic</string>
+    <string name="method_automatic_value">%1$s · automatic</string>
+    <string name="method_automatic_desc">By the country of your location: %1$s</string>
+    <string name="method_sheet_desc">Prayer times are calculated on your phone. Choose the method your local mosque follows, or let the app pick by country.</string>
+    <string name="method_angles">Fajr %1$s° · Isha %2$s°</string>
+    <string name="method_angles_interval">Fajr %1$s° · Isha %2$s min after Maghrib</string>
+    <string name="method_mwl">Muslim World League</string>
+    <string name="method_egypt">Egypt</string>
+    <string name="method_umm_al_qura">Umm al-Qura, Makkah</string>
+    <string name="method_karachi">Karachi</string>
+    <string name="method_north_america">North America (ISNA)</string>
+    <string name="method_algeria">Algeria</string>
+    <string name="method_morocco">Morocco</string>
+    <string name="method_tunisia">Tunisia</string>
+    <string name="method_jordan">Jordan</string>
+    <string name="method_dubai">Dubai</string>
+    <string name="method_qatar">Qatar</string>
+    <string name="method_kuwait">Kuwait</string>
+    <string name="method_turkey">Turkey (Diyanet)</string>
+    <string name="method_tehran">Tehran</string>
+    <string name="method_russia">Russia</string>
+    <string name="method_france">France (UOIF)</string>
+    <string name="method_portugal">Portugal (Lisbon)</string>
+    <string name="method_singapore">Singapore</string>
+    <string name="method_malaysia">Malaysia (JAKIM)</string>
+    <string name="method_indonesia">Indonesia (Kemenag)</string>
 
     <string name="app_language">App language</string>
     <string name="language_system">System default</string>

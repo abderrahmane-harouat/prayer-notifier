@@ -1,5 +1,6 @@
 package com.example.prayernotifier.data.persistence
 
+import com.example.prayernotifier.data.calculation.CalculationMethod
 import kotlinx.serialization.Serializable
 
 /** Mirrors the Flutter `lib/models/settings.dart` defaults. */
@@ -56,7 +57,9 @@ data class AppSettings(
     val travelTimeSettings: TravelTimeSettings = TravelTimeSettings(),
     val timeAdjustments: PrayerTimeAdjustments = PrayerTimeAdjustments(),
     val darkMode: Boolean = false,
-    val hijriDateAdjustment: Int = 0
+    val hijriDateAdjustment: Int = 0,
+    /** A [CalculationMethod] name the user picked; null = by the place's country. */
+    val calculationMethod: String? = null
 ) {
     fun getSettingsForPrayer(prayerName: String): PrayerNotificationSettings = when (prayerName) {
         "Fajr" -> fajrSettings
@@ -66,4 +69,8 @@ data class AppSettings(
         "Isha" -> ishaSettings
         else -> PrayerNotificationSettings()
     }
+
+    /** The user's own choice of method, or null to follow the country. */
+    val chosenMethod: CalculationMethod?
+        get() = CalculationMethod.fromName(calculationMethod)
 }

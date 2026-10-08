@@ -17,7 +17,7 @@ import kotlin.coroutines.resume
 class AndroidGeocoderProvider(context: Context) : GeocodeProvider {
     private val geocoder = Geocoder(context.applicationContext, Locale.ENGLISH)
 
-    override suspend fun placeName(latitude: Double, longitude: Double): String? =
+    override suspend fun lookup(latitude: Double, longitude: Double): GeocodedPlace? =
         withContext(Dispatchers.IO) {
             val addresses = try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -40,6 +40,9 @@ class AndroidGeocoderProvider(context: Context) : GeocodeProvider {
                 return@withContext null
             }
             val address = addresses.firstOrNull() ?: return@withContext null
-            pickPlaceName(address.locality, address.adminArea, address.countryName, address.featureName)
+            GeocodedPlace(
+                name = pickPlaceName(address.locality, address.adminArea, address.countryName, address.featureName),
+                countryCode = address.countryCode?.takeIf { it.isNotBlank() }
+            )
         }
 }
