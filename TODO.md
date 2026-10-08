@@ -4,7 +4,7 @@ Planned features and follow-ups. Nothing here is implemented yet.
 
 ## Privacy
 
-Goal: the app trusts no one with the user's location, Google included, and works fully on Android without Google Play services. What is still involved today is listed in the README's [Privacy](README.md#privacy) section. In order of priority:
+Goal: the app trusts no one with the user's location, Google included, and works fully on Android without Google Play services. What is still involved today is listed in [docs/privacy.md](docs/privacy.md). In order of priority:
 
 - [ ] **Get the position without Google Play services**
 
