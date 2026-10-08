@@ -1,6 +1,6 @@
 # Prayer Notifier
 
-**English** · [العربية](README.ar.md) · Version 0.3.0
+**English** · [العربية](README.ar.md) · Version 0.3.1
 
 A prayer times notifier for Android that works fully offline. It shows the five daily prayer times for where you are and sends a reminder before each prayer. The times are calculated on your phone from the sun's position, so there is nothing to download and it works for any date, with or without internet. Available in Arabic and English, with no ads, no analytics and no tracking.
 
