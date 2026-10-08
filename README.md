@@ -7,10 +7,11 @@ A prayer times notifier for Android that works fully offline. It shows the five 
 Privacy comes first: the app has no internet permission, and the aim is to trust no one with your location, not Google and as little as possible Android itself. A few Google services are still involved for now; [Privacy](#privacy) lists each one exactly, and [TODO.md](TODO.md#privacy) the plan to remove them.
 
 <p>
-  <img src="docs/screenshots/home_en.png" width="200" alt="Home screen: next prayer, countdown and today's prayers" />
-  <img src="docs/screenshots/settings_en.png" width="200" alt="Settings: reminders for every prayer" />
-  <img src="docs/screenshots/prayer_sheet_en.png" width="200" alt="One prayer's reminder and time correction" />
-  <img src="docs/screenshots/home_ar.png" width="200" alt="Home screen in Arabic, right-to-left" />
+  <img src="docs/screenshots/home_en.png" width="160" alt="Home screen: next prayer, countdown and today's prayers" />
+  <img src="docs/screenshots/settings_en.png" width="160" alt="Settings: each prayer with today's time and its reminder, and Jumua on Fridays" />
+  <img src="docs/screenshots/prayer_sheet_en.png" width="160" alt="One prayer's reminder and time correction, with today's time changing from 12:35 to 12:40" />
+  <img src="docs/screenshots/dnd_en.png" width="160" alt="Do Not Disturb at prayer time: how long each prayer stays silent, and today's window" />
+  <img src="docs/screenshots/home_ar.png" width="160" alt="Home screen in Arabic, right-to-left" />
 </p>
 
 ## Features
@@ -174,9 +175,11 @@ To build with Thmanyah:
 ```
 app/src/main/java/com/example/prayernotifier/
 ├── MainActivity.kt          # edge-to-edge, splash animation, language restore
-├── data/                    # prayer times, location, settings
+├── data/                    # prayer times for a place and date
 │   ├── calculation/         # on-device calculation, methods, country → method table
-│   └── notifications/       # reminder scheduling, alarm receiver, notifications
+│   ├── location/            # GPS fix, place name, country and time zone
+│   ├── notifications/       # reminders and Do Not Disturb: planning, alarms, receiver
+│   └── persistence/         # settings storage
 ├── i18n/                    # app language switching, prayer and method names
 └── ui/
     ├── AppShell.kt          # Home ↔ Settings with animated page transitions
@@ -188,8 +191,33 @@ app/src/main/res/
 ├── values/, values-ar/      # English and Arabic strings
 ├── drawable/                # Phosphor icons (ph_*), launcher icon, splash animation
 └── font/                    # Yeseva One, Tenor Sans, Raleway, Amiri
+app/src/test/                # unit tests, including the multi-day simulation
+app/src/debug/               # debug-only trigger for test reminders and silences
 archive/                     # the original Flutter version of the app (not maintained)
 ```
+
+## Changelog
+
+### 0.3.1
+
+- Without Do Not Disturb access, the whole Do Not Disturb card is locked, main switch included.
+- Settings keeps its scroll position when you change something.
+
+### 0.3.0
+
+- Choose how long each prayer's silence lasts, from 5 minutes to 2 hours, with today's window shown.
+- Settings explains every section, and each prayer shows today's time next to its reminder.
+
+### 0.2.0
+
+- Do Not Disturb at prayer time, on by default, and Jumua on Fridays with its own reminder and silence.
+- Prayer times calculated on the phone, with the method and the Asr rule chosen by country; no internet permission.
+- Today's time shown while correcting a prayer.
+- Fixes: Isha after midnight in the far north, days that can't be calculated near the poles, Arabic digits in corrected times.
+
+### 1.0
+
+- First version: prayer times from the Aladhan API, with a 10-year download for offline use. Version numbers restarted at 0.2.0 when the app moved to on-device calculation.
 
 ## Credits
 
