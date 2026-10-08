@@ -53,10 +53,6 @@ Do Not Disturb at prayer time and Jumua shipped in 0.2.0. Follow-ups:
 
   Done on the stock Android 14 emulator: the rule turns on at the adhan and off at the end, survives a restart, leaves the user's own Do Not Disturb alone, keeps a manual "off" during prayer, and is removed when the feature is switched off. Done on a Samsung Galaxy M32 (One UI, Android 13): the rule is created, turns on and off on time, and the user's own Do Not Disturb is kept. Still to check on Samsung: a restart in the middle of a silence, and a real prayer time (not the test command) with the release build.
 
-- [ ] **Let the user choose how long each silence lasts**
-
-  Fixed today at 35 minutes for Fajr, 1 hour for Jumua and 15 minutes for the others (`SilenceSettings.minutesFor`). A duration per prayer in the Do Not Disturb card (for example 10 to 60 minutes) would fit mosques with longer prayers.
-
 - [ ] **A time correction for Jumua**
 
   Jumua uses Dhuhr's time and correction. Many mosques start the sermon later than Dhuhr; a separate Jumua correction would move its reminder and silence without touching Dhuhr on other days.

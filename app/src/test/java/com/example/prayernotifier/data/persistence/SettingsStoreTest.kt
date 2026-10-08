@@ -66,8 +66,22 @@ class SettingsStoreTest {
 
     @Test
     fun `silence lasts 35 min after Fajr, an hour after Jumua, 15 after the others`() {
-        assertEquals(35, SilenceSettings.minutesFor("Fajr"))
-        assertEquals(60, SilenceSettings.minutesFor("Jumua"))
-        listOf("Dhuhr", "Asr", "Maghrib", "Isha").forEach { assertEquals(15, SilenceSettings.minutesFor(it)) }
+        val defaults = SilenceSettings()
+        assertEquals(35, defaults.minutesFor("Fajr"))
+        assertEquals(60, defaults.minutesFor("Jumua"))
+        listOf("Dhuhr", "Asr", "Maghrib", "Isha").forEach { assertEquals(15, defaults.minutesFor(it)) }
+    }
+
+    @Test
+    fun `each silence length can be changed, within 5 to 120 minutes`() = runTest {
+        val changed = SilenceSettings().withMinutes("Isha", 25).withMinutes("Jumua", 90)
+        assertEquals(25, changed.minutesFor("Isha"))
+        assertEquals(90, changed.minutesFor("Jumua"))
+        assertEquals(15, changed.minutesFor("Asr"))
+        assertEquals(5, SilenceSettings().withMinutes("Fajr", 0).minutesFor("Fajr"))
+        assertEquals(120, SilenceSettings().withMinutes("Fajr", 500).minutesFor("Fajr"))
+
+        settings.save(AppSettings(silence = changed))
+        assertEquals(changed, settings.load().silence)
     }
 }

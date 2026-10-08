@@ -51,8 +51,9 @@ data class PrayerTimeAdjustments(
 
 /**
  * Do Not Disturb from each prayer's adhan, switched off by itself after
- * [minutesFor]. On by default; works once Android grants the app Do Not
- * Disturb access.
+ * [minutesFor]: 35 minutes for Fajr, an hour for Jumua and 15 for the
+ * others unless the user changes them. On by default; works once Android
+ * grants the app Do Not Disturb access.
  */
 @Serializable
 data class SilenceSettings(
@@ -62,7 +63,14 @@ data class SilenceSettings(
     val asr: Boolean = true,
     val maghrib: Boolean = true,
     val isha: Boolean = true,
-    val jumua: Boolean = true
+    val jumua: Boolean = true,
+    /** How long the phone stays silent from each adhan, in minutes. */
+    val fajrMinutes: Int = 35,
+    val dhuhrMinutes: Int = 15,
+    val asrMinutes: Int = 15,
+    val maghribMinutes: Int = 15,
+    val ishaMinutes: Int = 15,
+    val jumuaMinutes: Int = 60
 ) {
     /** Whether the phone goes silent at this prayer ("Jumua" on Fridays). */
     fun isOnFor(prayer: String): Boolean = enabled && when (prayer) {
@@ -86,13 +94,34 @@ data class SilenceSettings(
         else -> this
     }
 
-    companion object {
-        /** How long the phone stays silent from the adhan. */
-        fun minutesFor(prayer: String): Int = when (prayer) {
-            "Fajr" -> 35
-            PrayerMath.JUMUA -> 60
-            else -> 15
+    /** How long the phone stays silent from this prayer's adhan, within [MIN_MINUTES]..[MAX_MINUTES]. */
+    fun minutesFor(prayer: String): Int = when (prayer) {
+        "Fajr" -> fajrMinutes
+        "Dhuhr" -> dhuhrMinutes
+        "Asr" -> asrMinutes
+        "Maghrib" -> maghribMinutes
+        "Isha" -> ishaMinutes
+        PrayerMath.JUMUA -> jumuaMinutes
+        else -> 15
+    }.coerceIn(MIN_MINUTES, MAX_MINUTES)
+
+    /** The same settings with one prayer's silence lasting [minutes]. */
+    fun withMinutes(prayer: String, minutes: Int): SilenceSettings {
+        val value = minutes.coerceIn(MIN_MINUTES, MAX_MINUTES)
+        return when (prayer) {
+            "Fajr" -> copy(fajrMinutes = value)
+            "Dhuhr" -> copy(dhuhrMinutes = value)
+            "Asr" -> copy(asrMinutes = value)
+            "Maghrib" -> copy(maghribMinutes = value)
+            "Isha" -> copy(ishaMinutes = value)
+            PrayerMath.JUMUA -> copy(jumuaMinutes = value)
+            else -> this
         }
+    }
+
+    companion object {
+        const val MIN_MINUTES = 5
+        const val MAX_MINUTES = 120
     }
 }
 

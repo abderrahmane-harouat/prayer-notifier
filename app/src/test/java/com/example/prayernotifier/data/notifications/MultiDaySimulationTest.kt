@@ -87,6 +87,17 @@ class MultiDaySimulationTest {
         )
     )
 
+    @Test fun `silence lengths the user changed, one running into the next prayer, three years`() = simulate(
+        algiers, LocalDate.of(2026, 10, 8), days = 1096, disruptions = Random(5),
+        settings = AppSettings(
+            silence = SilenceSettings()
+                .withMinutes("Fajr", 60)
+                .withMinutes("Dhuhr", 5)
+                .withMinutes("Maghrib", 120) // reaches past Isha: one long silence
+                .withMinutes("Jumua", 90)
+        )
+    )
+
     @Test fun `random reboots and re-plans from the app, three years`() =
         simulate(london, LocalDate.of(2026, 10, 8), days = 1096, disruptions = Random(7))
 
@@ -218,7 +229,7 @@ class MultiDaySimulationTest {
                     )
                 }
                 if (settings.silence.isOnFor(shown)) {
-                    windows += adhan to adhan.plusMinutes(SilenceSettings.minutesFor(shown).toLong())
+                    windows += adhan to adhan.plusMinutes(settings.silence.minutesFor(shown).toLong())
                 }
             }
             date = date.plusDays(1)

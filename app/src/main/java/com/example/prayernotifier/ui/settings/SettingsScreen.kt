@@ -55,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -63,6 +64,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -111,6 +113,7 @@ private sealed interface Sheet {
     data object Hijri : Sheet
     data object Method : Sheet
     data object Asr : Sheet
+    data class Silence(val prayer: String) : Sheet
     data class Prayer(val prayer: String) : Sheet
     data object Language : Sheet
 }
@@ -205,7 +208,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                 }
 
                 item {
-                    SectionEyebrow(stringResource(R.string.section_notifications))
+                    SectionEyebrow(stringResource(R.string.section_notifications), stringResource(R.string.caption_notifications))
                     ReminderForAllCard(
                         settings = state.settings,
                         onSelect = { vm.setReminderForAll(it) }
@@ -213,11 +216,12 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                 }
 
                 item {
-                    SectionEyebrow(stringResource(R.string.prayers))
+                    SectionEyebrow(stringResource(R.string.prayers), stringResource(R.string.caption_prayers))
                     WonderCard {
                         vm.prayerNames().forEachIndexed { index, prayer ->
                             PrayerRow(
                                 prayer = prayer,
+                                time = state.adhanToday(prayer),
                                 reminder = state.settings.getSettingsForPrayer(prayer),
                                 adjustment = vm.adjustmentOf(prayer),
                                 onOpen = { sheet = Sheet.Prayer(prayer) },
@@ -233,10 +237,11 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                 }
 
                 item {
-                    SectionEyebrow(stringResource(R.string.section_jumua))
+                    SectionEyebrow(stringResource(R.string.section_jumua), stringResource(R.string.caption_jumua))
                     WonderCard {
                         PrayerRow(
                             prayer = PrayerMath.JUMUA,
+                            time = null,
                             reminder = state.settings.jumuaSettings,
                             adjustment = 0,
                             onOpen = { sheet = Sheet.Prayer(PrayerMath.JUMUA) },
@@ -251,7 +256,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                 }
 
                 item {
-                    SectionEyebrow(stringResource(R.string.section_dnd))
+                    SectionEyebrow(stringResource(R.string.section_dnd), stringResource(R.string.caption_dnd))
                     // Granted only from Android's own settings screen, never a dialog.
                     if (DND_SUPPORTED && state.settings.silence.enabled && !state.dndAllowed) {
                         PermissionBanner(
@@ -264,13 +269,16 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     }
                     SilenceCard(
                         silence = state.settings.silence,
+                        locked = !state.dndAllowed,
+                        adhanToday = state::adhanToday,
                         onToggle = { vm.setSilenceEnabled(it) },
-                        onTogglePrayer = { prayer, on -> vm.setSilenceFor(prayer, on) }
+                        onTogglePrayer = { prayer, on -> vm.setSilenceFor(prayer, on) },
+                        onOpenPrayer = { sheet = Sheet.Silence(it) }
                     )
                 }
 
                 item {
-                    SectionEyebrow(stringResource(R.string.section_prayer_times))
+                    SectionEyebrow(stringResource(R.string.section_prayer_times), stringResource(R.string.caption_prayer_times))
                     WonderCard {
                         MetaRow(
                             label = stringResource(R.string.calculation_method),
@@ -295,7 +303,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                 }
 
                 item {
-                    SectionEyebrow(stringResource(R.string.section_calendar))
+                    SectionEyebrow(stringResource(R.string.section_calendar), stringResource(R.string.caption_calendar))
                     WonderCard {
                         MetaRow(
                             label = stringResource(R.string.hijri_correction),
@@ -306,7 +314,7 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                 }
 
                 item {
-                    SectionEyebrow(stringResource(R.string.section_language))
+                    SectionEyebrow(stringResource(R.string.section_language), stringResource(R.string.caption_language))
                     WonderCard {
                         MetaRow(
                             label = stringResource(R.string.app_language),
@@ -366,6 +374,13 @@ fun SettingsScreen(visible: Boolean, onBack: () -> Unit) {
                     chosen = state.settings.chosenMethod,
                     automatic = state.automaticMethod,
                     onSelect = { vm.setMethod(it); sheet = null }
+                )
+                is Sheet.Silence -> SilenceSheet(
+                    prayer = current.prayer,
+                    minutes = state.settings.silence.minutesFor(current.prayer),
+                    adhanToday = state.adhanToday(current.prayer),
+                    onSave = { vm.setSilenceMinutes(current.prayer, it); sheet = null },
+                    onCancel = { sheet = null }
                 )
                 Sheet.Asr -> AsrSheet(
                     chosen = state.settings.chosenAsr,
@@ -453,14 +468,26 @@ private fun LanguageSheet(current: String, onSelect: (String) -> Unit) {
     }
 }
 
-/** Section ceremony: uppercase Tenor label between rules. */
+/** Section ceremony: uppercase Tenor label between rules, then what the section is for. */
 @Composable
-private fun SectionEyebrow(text: String) {
+private fun SectionEyebrow(text: String, caption: String? = null) {
     EyebrowLabel(
         text = text,
         color = WonderAccent2,
-        modifier = Modifier.padding(top = WonderSpacing.x16, bottom = WonderSpacing.x16)
+        modifier = Modifier.padding(top = WonderSpacing.x16, bottom = if (caption == null) WonderSpacing.x16 else WonderSpacing.x8)
     )
+    if (caption != null) {
+        Text(
+            text = caption,
+            style = MaterialTheme.typography.bodySmall,
+            color = WonderCaption,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = WonderSpacing.x8)
+                .padding(bottom = WonderSpacing.x16)
+        )
+    }
 }
 
 @Composable
@@ -470,7 +497,14 @@ private fun wonderSwitchColors() = SwitchDefaults.colors(
     checkedBorderColor = WonderAccent1,
     uncheckedThumbColor = WonderGreyMedium,
     uncheckedTrackColor = WonderBlack,
-    uncheckedBorderColor = WonderGreyMedium
+    uncheckedBorderColor = WonderGreyMedium,
+    // Locked switches keep their on/off look; the greyed card shows they're locked.
+    disabledCheckedThumbColor = WonderWhite,
+    disabledCheckedTrackColor = WonderAccent1,
+    disabledCheckedBorderColor = WonderAccent1,
+    disabledUncheckedThumbColor = WonderGreyMedium,
+    disabledUncheckedTrackColor = WonderBlack,
+    disabledUncheckedBorderColor = WonderGreyMedium
 )
 
 /** Accent-ruled callout, like Wonderous' pull quote: 1dp orange rule at left. */
@@ -527,14 +561,20 @@ private val JUMUA_REMINDER_CHOICES = listOf(0, 15, 30, 45, 60)
 private val DND_SUPPORTED = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
 /**
- * The master switch, then one switch per prayer with how long the phone
- * stays silent (Fajr 35 min, Jumua 1 hour, the others 15 min).
+ * The master switch, then each prayer with how long the phone stays
+ * silent and, today, from when to when. Tap a prayer to change the length.
+ * Without Do Not Disturb access the prayers are greyed out and locked:
+ * nothing there can take effect until Android grants it. The master
+ * switch stays usable, so the feature can still be turned off.
  */
 @Composable
 private fun SilenceCard(
     silence: SilenceSettings,
+    locked: Boolean,
+    adhanToday: (String) -> String?,
     onToggle: (Boolean) -> Unit,
-    onTogglePrayer: (String, Boolean) -> Unit
+    onTogglePrayer: (String, Boolean) -> Unit,
+    onOpenPrayer: (String) -> Unit
 ) {
     WonderCard {
         Row(
@@ -566,43 +606,75 @@ private fun SilenceCard(
             )
         }
         if (DND_SUPPORTED && silence.enabled) {
-            (PrayerMath.ORDER + PrayerMath.JUMUA).forEach { prayer ->
+            if (locked) {
                 WonderDivider()
-                SilenceRow(
-                    prayer = prayer,
-                    on = silence.isOnFor(prayer),
-                    onToggle = { onTogglePrayer(prayer, it) }
+                Text(
+                    text = stringResource(R.string.dnd_locked),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = WonderCaption,
+                    modifier = Modifier.padding(horizontal = WonderSpacing.x24, vertical = WonderSpacing.x12)
                 )
+            }
+            Column(Modifier.alpha(if (locked) 0.4f else 1f)) {
+                (PrayerMath.ORDER + PrayerMath.JUMUA).forEach { prayer ->
+                    WonderDivider()
+                    SilenceRow(
+                        prayer = prayer,
+                        on = silence.isOnFor(prayer),
+                        minutes = silence.minutesFor(prayer),
+                        adhanToday = if (prayer == PrayerMath.JUMUA) null else adhanToday(prayer),
+                        enabled = !locked,
+                        onOpen = { onOpenPrayer(prayer) },
+                        onToggle = { onTogglePrayer(prayer, it) }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SilenceRow(prayer: String, on: Boolean, onToggle: (Boolean) -> Unit) {
+private fun SilenceRow(
+    prayer: String,
+    on: Boolean,
+    minutes: Int,
+    adhanToday: String?,
+    enabled: Boolean,
+    onOpen: () -> Unit,
+    onToggle: (Boolean) -> Unit
+) {
     val name = stringResource(prayerNameRes(prayer))
-    val minutes = SilenceSettings.minutesFor(prayer)
     val description = stringResource(R.string.cd_dnd_prayer, name)
+    val length = pluralStringResource(R.plurals.dnd_for_minutes, minutes, minutes.toString())
+    val summary = when {
+        !on -> stringResource(R.string.off)
+        adhanToday != null -> stringResource(
+            R.string.dnd_window_today, length, adhanToday, PrayerMath.adjustTime(adhanToday, minutes)
+        )
+        else -> length
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Switch, onClickLabel = description) { onToggle(!on) }
-            .padding(horizontal = WonderSpacing.x24, vertical = WonderSpacing.x12),
+            .clickable(enabled = enabled, role = Role.Button, onClick = onOpen)
+            .padding(start = WonderSpacing.x24, end = WonderSpacing.x16, top = WonderSpacing.x12, bottom = WonderSpacing.x12),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
             Text(text = name, style = MaterialTheme.typography.titleMedium, color = WonderOffWhite)
             Text(
-                text = if (minutes % 60 == 0) {
-                    stringResource(R.string.dnd_for_hour)
-                } else {
-                    pluralStringResource(R.plurals.dnd_for_minutes, minutes, minutes.toString())
-                },
+                text = summary,
                 style = MaterialTheme.typography.bodySmall,
                 color = if (on) WonderAccent2 else WonderCaption
             )
         }
-        Switch(checked = on, onCheckedChange = onToggle, colors = wonderSwitchColors())
+        Switch(
+            checked = on,
+            onCheckedChange = onToggle,
+            enabled = enabled,
+            colors = wonderSwitchColors(),
+            modifier = Modifier.semantics { contentDescription = description }
+        )
     }
 }
 
@@ -662,6 +734,8 @@ private fun ReminderForAllCard(settings: AppSettings, onSelect: (Int) -> Unit) {
 @Composable
 private fun PrayerRow(
     prayer: String,
+    /** Today's time with its correction; null for Jumua. */
+    time: String?,
     reminder: PrayerNotificationSettings,
     adjustment: Int,
     onOpen: () -> Unit,
@@ -681,11 +755,11 @@ private fun PrayerRow(
     } else {
         stringResource(R.string.silent)
     }
-    val summary = if (adjustment == 0) {
-        reminderText
-    } else {
-        reminderText + " · " + stringResource(R.string.summary_time, offsetLabel(adjustment, days = false))
-    }
+    val summary = listOfNotNull(
+        time,
+        reminderText,
+        if (adjustment == 0) null else stringResource(R.string.summary_time, offsetLabel(adjustment, days = false))
+    ).joinToString(" · ")
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1009,11 +1083,20 @@ private fun PrayerSheet(
 @Composable
 private fun CorrectionPreview(calculatedTime: String, shift: Int) {
     val corrected = PrayerMath.adjustTime(calculatedTime, shift)
-    val description = if (shift == 0) {
-        stringResource(R.string.cd_correction_preview, calculatedTime)
-    } else {
-        stringResource(R.string.cd_correction_preview_shifted, calculatedTime, corrected)
-    }
+    TimePreview(
+        from = calculatedTime,
+        to = corrected.takeIf { shift != 0 },
+        description = if (shift == 0) {
+            stringResource(R.string.cd_correction_preview, calculatedTime)
+        } else {
+            stringResource(R.string.cd_correction_preview_shifted, calculatedTime, corrected)
+        }
+    )
+}
+
+/** "TODAY" over a time, or over a time and the one it leads to ("12:35 › 12:50"). */
+@Composable
+private fun TimePreview(from: String, to: String?, description: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1028,11 +1111,11 @@ private fun CorrectionPreview(calculatedTime: String, shift: Int) {
         Spacer(Modifier.height(WonderSpacing.x4))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = calculatedTime,
+                text = from,
                 style = MaterialTheme.typography.headlineMedium,
-                color = if (shift == 0) WonderOffWhite else WonderCaption
+                color = if (to == null) WonderOffWhite else WonderCaption
             )
-            if (shift != 0) {
+            if (to != null) {
                 Icon(
                     painter = painterResource(R.drawable.ph_caret_right_light),
                     contentDescription = null,
@@ -1042,7 +1125,7 @@ private fun CorrectionPreview(calculatedTime: String, shift: Int) {
                     tint = WonderCaption
                 )
                 Text(
-                    text = corrected,
+                    text = to,
                     style = MaterialTheme.typography.headlineMedium,
                     color = WonderAccent1
                 )
@@ -1050,6 +1133,76 @@ private fun CorrectionPreview(calculatedTime: String, shift: Int) {
         }
     }
 }
+
+/**
+ * How long one prayer's silence lasts, 5 minutes to 2 hours in steps of
+ * 5, with today's silence shown as it changes ("12:35 › 12:50").
+ */
+@Composable
+private fun SilenceSheet(
+    prayer: String,
+    minutes: Int,
+    /** Today's adhan with its correction; null for Jumua or without a place. */
+    adhanToday: String?,
+    onSave: (Int) -> Unit,
+    onCancel: () -> Unit
+) {
+    var draft by remember(minutes) { mutableIntStateOf(minutes) }
+    SheetColumn(title = stringResource(prayerNameRes(prayer))) {
+        Text(
+            text = stringResource(R.string.section_dnd).uppercase(),
+            style = MaterialTheme.typography.titleSmall,
+            color = WonderAccent2
+        )
+        Spacer(Modifier.height(WonderSpacing.x4))
+        Text(
+            text = stringResource(R.string.silence_sheet_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = WonderCaption
+        )
+        if (adhanToday != null) {
+            val end = PrayerMath.adjustTime(adhanToday, draft)
+            Spacer(Modifier.height(WonderSpacing.x16))
+            TimePreview(
+                from = adhanToday,
+                to = end,
+                description = stringResource(R.string.cd_silence_preview, adhanToday, end)
+            )
+        }
+        Spacer(Modifier.height(WonderSpacing.x12))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircleButton(
+                icon = R.drawable.ph_minus_light,
+                contentDescription = stringResource(R.string.decrease),
+                onClick = { draft = (draft - SILENCE_STEP).coerceAtLeast(SilenceSettings.MIN_MINUTES) },
+                containerColor = WonderBlack
+            )
+            Text(
+                text = pluralStringResource(R.plurals.offset_minutes, draft, draft.toString()),
+                style = MaterialTheme.typography.headlineMedium,
+                color = WonderAccent1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(176.dp)
+            )
+            CircleButton(
+                icon = R.drawable.ph_plus_light,
+                contentDescription = stringResource(R.string.increase),
+                onClick = { draft = (draft + SILENCE_STEP).coerceAtMost(SilenceSettings.MAX_MINUTES) },
+                containerColor = WonderBlack
+            )
+        }
+        Spacer(Modifier.height(WonderSpacing.x32))
+        WonderPrimaryButton(text = stringResource(R.string.save), onClick = { onSave(draft) }, containerColor = WonderBlack)
+        Spacer(Modifier.height(WonderSpacing.x8))
+        WonderTextButton(text = stringResource(R.string.cancel), onClick = onCancel)
+    }
+}
+
+private const val SILENCE_STEP = 5
 
 /** Sheet ceremony: centered Tenor title, ornament, then content. */
 @Composable

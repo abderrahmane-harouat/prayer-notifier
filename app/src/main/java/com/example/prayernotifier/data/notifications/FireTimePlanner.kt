@@ -3,7 +3,6 @@ package com.example.prayernotifier.data.notifications
 import com.example.prayernotifier.data.PrayerMath
 import com.example.prayernotifier.data.PrayerTimings
 import com.example.prayernotifier.data.persistence.AppSettings
-import com.example.prayernotifier.data.persistence.SilenceSettings
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -57,7 +56,7 @@ object FireTimePlanner {
                 .dateTimeFor(timings, settings.timeAdjustments, prayer, date)
                 .atZone(now.zone)
             if (settings.silence.isOnFor(shown) && at.isAfter(now)) {
-                silences += PlannedSilence(shown, at, at.plusMinutes(SilenceSettings.minutesFor(shown).toLong()))
+                silences += PlannedSilence(shown, at, at.plusMinutes(settings.silence.minutesFor(shown).toLong()))
             }
             val prayerSettings = settings.getSettingsForPrayer(shown)
             if (!prayerSettings.enabled) continue

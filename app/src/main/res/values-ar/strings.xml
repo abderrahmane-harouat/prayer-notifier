@@ -177,7 +177,7 @@
     <string name="jumua_note">تحلّ الجمعة محلّ الظهر يوم الجمعة، في وقت الظهر وبتعديله.</string>
     <string name="section_dnd">عدم الإزعاج</string>
     <string name="dnd_title">إسكات الهاتف وقت الصلاة</string>
-    <string name="dnd_desc">يُفعَّل «عدم الإزعاج» عند الأذان ويتوقف تلقائيًا بعده. وتبقى المنبّهات والمكالمات المتكرّرة تصل.</string>
+    <string name="dnd_desc">تبقى المنبّهات والوسائط والمكالمات المتكرّرة تصل.</string>
     <string name="dnd_needs_android10">يتطلب أندرويد 10 أو أحدث.</string>
     <string name="dnd_access_title">إذن «عدم الإزعاج» غير مفعّل</string>
     <string name="dnd_access_desc">لا يسمح به أندرويد إلا من إعداداته: ابحث عن منبّه الصلاة في القائمة وفعّله.</string>
@@ -189,11 +189,23 @@
         <item quantity="many">صامت %1$s دقيقة</item>
         <item quantity="other">صامت %1$s دقيقة</item>
     </plurals>
-    <string name="dnd_for_hour">صامت ساعة واحدة</string>
     <string name="cd_dnd_prayer">عدم الإزعاج في %1$s</string>
     <string name="dnd_rule_name">وقت الصلاة</string>
     <string name="notice_dnd_access">اسمح بإذن «عدم الإزعاج» لإسكات الهاتف وقت الصلاة.</string>
     <string name="allow">السماح</string>
+
+    <!-- Settings: what each section is for -->
+    <string name="caption_notifications">يصلك تذكير قبل كل صلاة. اختر هنا مدة واحدة لكل الصلوات، أو حدّد كل صلاة أدناه.</string>
+    <string name="caption_prayers">اضغط على صلاة لتغيير تذكيرها ولتعديل وقتها ليوافق مسجدك. والجرس يشغّل تذكيرها أو يوقفه.</string>
+    <string name="caption_jumua">يوم الجمعة تحلّ الجمعة محلّ الظهر بتذكير خاص بها. اضغط لتغييره.</string>
+    <string name="caption_dnd">يصمت الهاتف عند كل أذان ويعود تلقائيًا. اضغط على صلاة لتغيير مدة صمتها.</string>
+    <string name="caption_prayer_times">تُحسب المواقيت على هاتفك. الوضع التلقائي يتبع الطريقة الرسمية في بلدك؛ غيّرها إن كان مسجدك يتبع غيرها.</string>
+    <string name="caption_calendar">قدّم التاريخ الهجري أو أخّره يومًا أو يومين إن كان بلدك يبدأ الشهر قبل ذلك أو بعده.</string>
+    <string name="caption_language">لغة التطبيق، مستقلة عن لغة الهاتف إن شئت.</string>
+    <string name="dnd_locked">اسمح بإذن «عدم الإزعاج» أعلاه لتغيير هذه الإعدادات.</string>
+    <string name="dnd_window_today">%1$s · اليوم من %2$s إلى %3$s</string>
+    <string name="silence_sheet_desc">مدة صمت الهاتف بعد الأذان، من 5 دقائق إلى ساعتين. ثم يعود تلقائيًا.</string>
+    <string name="cd_silence_preview">اليوم صامت من %1$s إلى %2$s</string>
 
     <string name="app_language">لغة التطبيق</string>
     <string name="language_system">لغة النظام</string>

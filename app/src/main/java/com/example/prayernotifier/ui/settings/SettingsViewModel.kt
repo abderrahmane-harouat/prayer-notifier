@@ -41,6 +41,11 @@ data class SettingsUiState(
 
     /** The Asr rule the times actually use. */
     val asr: AsrMethod get() = settings.chosenAsr ?: automaticAsr
+
+    /** Today's adhan of a daily prayer with its correction ("12:38"), or null without a place. */
+    fun adhanToday(prayer: String): String? = today?.let {
+        PrayerMath.adjustTime(PrayerMath.timeOf(it, prayer), settings.timeAdjustments.getAdjustmentForPrayer(prayer))
+    }
 }
 
 class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
@@ -109,6 +114,11 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
         val settings = _state.value.settings
         persist(settings.copy(silence = settings.silence.copy(enabled = on)))
         if (!on) viewModelScope.launch { withContext(Dispatchers.IO) { graph.turnOffSilence() } }
+    }
+
+    fun setSilenceMinutes(prayer: String, minutes: Int) {
+        val settings = _state.value.settings
+        persist(settings.copy(silence = settings.silence.withMinutes(prayer, minutes)))
     }
 
     fun setSilenceFor(prayer: String, on: Boolean) {

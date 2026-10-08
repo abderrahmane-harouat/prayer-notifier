@@ -166,7 +166,7 @@
     <string name="jumua_note">Jumua takes Dhuhr\'s place on Fridays, at Dhuhr\'s time and with its correction.</string>
     <string name="section_dnd">Do Not Disturb</string>
     <string name="dnd_title">Silence the phone at prayer</string>
-    <string name="dnd_desc">Do Not Disturb turns on at the adhan and off by itself afterwards. Alarms and repeat callers still get through.</string>
+    <string name="dnd_desc">Alarms, media and repeat callers still get through.</string>
     <string name="dnd_needs_android10">Needs Android 10 or later.</string>
     <string name="dnd_access_title">Do Not Disturb access is off</string>
     <string name="dnd_access_desc">Android allows it only from its settings: find Prayer Notifier in the list and turn it on.</string>
@@ -174,11 +174,23 @@
         <item quantity="one">Silent for %1$s min</item>
         <item quantity="other">Silent for %1$s min</item>
     </plurals>
-    <string name="dnd_for_hour">Silent for 1 hour</string>
     <string name="cd_dnd_prayer">Do Not Disturb at %1$s</string>
     <string name="dnd_rule_name">Prayer time</string>
     <string name="notice_dnd_access">Allow Do Not Disturb access to silence the phone at prayer time.</string>
     <string name="allow">Allow</string>
+
+    <!-- Settings: what each section is for -->
+    <string name="caption_notifications">A reminder comes before every prayer. Pick one lead time for all of them here, or set each prayer below.</string>
+    <string name="caption_prayers">Tap a prayer to change its reminder and to correct its time to match your mosque. The bell turns its reminder on or off.</string>
+    <string name="caption_jumua">On Fridays, Jumua takes Dhuhr\'s place with its own reminder. Tap to change it.</string>
+    <string name="caption_dnd">The phone goes quiet at each adhan and comes back by itself. Tap a prayer to change how long it stays silent.</string>
+    <string name="caption_prayer_times">Times are calculated on your phone. Automatic follows your country\'s official method; change it if your mosque uses another.</string>
+    <string name="caption_calendar">Move the Hijri date a day or two if your country starts the month earlier or later.</string>
+    <string name="caption_language">The app\'s language, separate from the phone\'s if you like.</string>
+    <string name="dnd_locked">Allow Do Not Disturb access above to change these.</string>
+    <string name="dnd_window_today">%1$s · today %2$s to %3$s</string>
+    <string name="silence_sheet_desc">How long the phone stays silent after the adhan, from 5 minutes to 2 hours. It comes back on by itself.</string>
+    <string name="cd_silence_preview">Today silent from %1$s to %2$s</string>
 
     <string name="app_language">App language</string>
     <string name="language_system">System default</string>

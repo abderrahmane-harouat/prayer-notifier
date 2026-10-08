@@ -114,6 +114,14 @@ class FireTimePlannerTest {
         assertEquals(at(16, 25), asr.endAt)
     }
 
+    @Test fun `silence lasts as long as the user set`() {
+        val settings = AppSettings(silence = SilenceSettings().withMinutes("Fajr", 50).withMinutes("Isha", 5))
+        val plan = FireTimePlanner.plan(date, timings, settings, at(4, 0))
+        assertEquals(at(6, 2), plan.silences.first { it.prayer == "Fajr" }.endAt) // 05:12 + 50
+        assertEquals(at(20, 25), plan.silences.first { it.prayer == "Isha" }.endAt) // 20:20 + 5
+        assertEquals(at(16, 25), plan.silences.first { it.prayer == "Asr" }.endAt) // unchanged 15
+    }
+
     @Test fun `silence follows the prayer's time correction`() {
         val settings = AppSettings(timeAdjustments = PrayerTimeAdjustments(maghribAdjustment = 3))
         val maghrib = FireTimePlanner.plan(date, timings, settings, at(4, 0)).silences.first { it.prayer == "Maghrib" }
