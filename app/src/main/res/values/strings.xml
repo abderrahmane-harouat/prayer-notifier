@@ -166,7 +166,7 @@
     <string name="jumua_note">Jumua takes Dhuhr\'s place on Fridays, at Dhuhr\'s time and with its correction.</string>
     <string name="section_dnd">Do Not Disturb</string>
     <string name="dnd_title">Silence the phone at prayer</string>
-    <string name="dnd_desc">Calls still arrive, silently. Only alarms and media make sound.</string>
+    <string name="dnd_desc">Total silence: no ringing, notifications, alarms or media. Calls still arrive, silently.</string>
     <string name="dnd_needs_android10">Needs Android 10 or later.</string>
     <string name="dnd_access_title">Do Not Disturb access is off</string>
     <string name="dnd_access_desc">Android allows it only from its settings: find Prayer Notifier in the list and turn it on.</string>

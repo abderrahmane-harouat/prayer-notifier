@@ -1,6 +1,6 @@
 # Prayer Notifier
 
-**English** · [العربية](README.ar.md) · Version 0.3.2 · [Changelog](CHANGELOG.md)
+**English** · [العربية](README.ar.md) · Version 0.3.3 · [Changelog](CHANGELOG.md)
 
 A privacy-first prayer times app for Android. Prayer times are calculated on your phone from the sun's position, so it works offline for any date, and the app has no internet permission at all. A reminder before each prayer, Do Not Disturb during prayer, and Jumua on Fridays, in Arabic and English. No ads, no analytics, no tracking.
 

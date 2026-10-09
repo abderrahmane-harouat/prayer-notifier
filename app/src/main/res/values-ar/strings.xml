@@ -177,7 +177,7 @@
     <string name="jumua_note">تحلّ الجمعة محلّ الظهر يوم الجمعة، في وقت الظهر وبتعديله.</string>
     <string name="section_dnd">عدم الإزعاج</string>
     <string name="dnd_title">إسكات الهاتف وقت الصلاة</string>
-    <string name="dnd_desc">تصل المكالمات بصمت، ولا يصدر صوتًا إلا المنبّه والوسائط.</string>
+    <string name="dnd_desc">صمت تام: لا رنين ولا إشعارات ولا منبّهات ولا وسائط. وتصل المكالمات بصمت.</string>
     <string name="dnd_needs_android10">يتطلب أندرويد 10 أو أحدث.</string>
     <string name="dnd_access_title">إذن «عدم الإزعاج» غير مفعّل</string>
     <string name="dnd_access_desc">لا يسمح به أندرويد إلا من إعداداته: ابحث عن منبّه الصلاة في القائمة وفعّله.</string>

@@ -2,6 +2,10 @@
 
 [← README](README.md) · [العربية](CHANGELOG.ar.md)
 
+## 0.3.3
+
+- Prayer silence is now total: no ringing, notification sounds, alarms, media or vibration. Calls and notifications still arrive, silently.
+
 ## 0.3.2
 
 - Calls no longer ring during prayer silence, even when someone calls twice; they still arrive, silently.

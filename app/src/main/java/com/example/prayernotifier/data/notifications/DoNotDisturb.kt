@@ -7,7 +7,6 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.service.notification.Condition
-import android.service.notification.ZenPolicy
 import androidx.annotation.RequiresApi
 import com.example.prayernotifier.MainActivity
 import com.example.prayernotifier.R
@@ -27,13 +26,13 @@ interface Silencer {
 /**
  * [Silencer] through an automatic Do Not Disturb rule named "Prayer time",
  * owned by the app and visible in the system's Do Not Disturb settings
- * (Modes on Android 15+), where the user can see and change it.
+ * (Modes on Android 15+), where the user can see it.
  *
  * The rule is separate from the user's own Do Not Disturb: switching the
  * rule off never turns off Do Not Disturb the user turned on, and if the
- * user turns it off early, Android keeps it off. While it is on, only alarms
- * and media make sound; calls still arrive, silently, and messages and other
- * notifications wait.
+ * user turns it off early, Android keeps it off. While it is on, the phone
+ * is totally silent: no ringing, notification sounds, alarms, media or
+ * vibration. Calls and notifications still arrive, silently.
  */
 class DoNotDisturbSilencer(context: Context) : Silencer {
     private val app = context.applicationContext
@@ -68,14 +67,15 @@ class DoNotDisturbSilencer(context: Context) : Silencer {
     private fun addRule(): String = manager.addAutomaticZenRule(rule())
 
     /**
-     * Rules made before 0.3.2 let repeat callers ring through the silence;
-     * give them the current [policy].
+     * Rules made before 0.3.3 let alarms and media (and before 0.3.2, repeat
+     * callers) make sound; make them totally silent, and keep them so.
      */
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun upgradeRule(id: String) {
         val existing = manager.getAutomaticZenRule(id) ?: return
-        if (existing.zenPolicy?.priorityCategoryRepeatCallers != ZenPolicy.STATE_ALLOW) return
-        existing.zenPolicy = policy()
+        if (existing.interruptionFilter == NotificationManager.INTERRUPTION_FILTER_NONE) return
+        existing.interruptionFilter = NotificationManager.INTERRUPTION_FILTER_NONE
+        existing.zenPolicy = null
         manager.updateAutomaticZenRule(id, existing)
     }
 
@@ -85,22 +85,10 @@ class DoNotDisturbSilencer(context: Context) : Silencer {
         null,
         ComponentName(app, MainActivity::class.java),
         CONDITION_ID,
-        policy(),
-        NotificationManager.INTERRUPTION_FILTER_PRIORITY,
+        null, // Android rejects a policy on any filter but "priority only"
+        NotificationManager.INTERRUPTION_FILTER_NONE,
         true
     )
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun policy(): ZenPolicy = ZenPolicy.Builder()
-        .allowAlarms(true)
-        .allowMedia(true)
-        .allowRepeatCallers(false)
-        .allowCalls(ZenPolicy.PEOPLE_TYPE_NONE)
-        .allowMessages(ZenPolicy.PEOPLE_TYPE_NONE)
-        .allowEvents(false)
-        .allowReminders(false)
-        .allowSystem(false)
-        .build()
 
     private fun condition(state: Int) = Condition(CONDITION_ID, ruleName(), state)
 
