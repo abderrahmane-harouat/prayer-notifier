@@ -103,7 +103,7 @@ class FireTimePlannerTest {
         assertEquals(at(11, 45), dhuhr.fireAt) // 12:45 − 60 min; still future at 11:40.
     }
 
-    @Test fun `silence starts at each adhan and lasts 35 min for Fajr, 15 for the others`() {
+    @Test fun `silence starts at each adhan and lasts 35 min for Fajr, 25 for the others`() {
         val plan = FireTimePlanner.plan(date, timings, AppSettings(), at(4, 0))
         assertEquals(listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"), plan.silences.map { it.prayer })
         val fajr = plan.silences.first()
@@ -111,7 +111,7 @@ class FireTimePlannerTest {
         assertEquals(at(5, 47), fajr.endAt)
         val asr = plan.silences.first { it.prayer == "Asr" }
         assertEquals(at(16, 10), asr.startAt)
-        assertEquals(at(16, 25), asr.endAt)
+        assertEquals(at(16, 35), asr.endAt)
     }
 
     @Test fun `silence lasts as long as the user set`() {
@@ -119,7 +119,7 @@ class FireTimePlannerTest {
         val plan = FireTimePlanner.plan(date, timings, settings, at(4, 0))
         assertEquals(at(6, 2), plan.silences.first { it.prayer == "Fajr" }.endAt) // 05:12 + 50
         assertEquals(at(20, 25), plan.silences.first { it.prayer == "Isha" }.endAt) // 20:20 + 5
-        assertEquals(at(16, 25), plan.silences.first { it.prayer == "Asr" }.endAt) // unchanged 15
+        assertEquals(at(16, 35), plan.silences.first { it.prayer == "Asr" }.endAt) // unchanged 25
     }
 
     @Test fun `silence follows the prayer's time correction`() {

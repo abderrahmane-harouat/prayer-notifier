@@ -51,7 +51,7 @@ data class PrayerTimeAdjustments(
 
 /**
  * Do Not Disturb from each prayer's adhan, switched off by itself after
- * [minutesFor]: 35 minutes for Fajr, an hour for Jumua and 15 for the
+ * [minutesFor]: 35 minutes for Fajr, an hour for Jumua and 25 for the
  * others unless the user changes them. On by default; works once Android
  * grants the app Do Not Disturb access.
  */
@@ -66,10 +66,10 @@ data class SilenceSettings(
     val jumua: Boolean = true,
     /** How long the phone stays silent from each adhan, in minutes. */
     val fajrMinutes: Int = 35,
-    val dhuhrMinutes: Int = 15,
-    val asrMinutes: Int = 15,
-    val maghribMinutes: Int = 15,
-    val ishaMinutes: Int = 15,
+    val dhuhrMinutes: Int = 25,
+    val asrMinutes: Int = 25,
+    val maghribMinutes: Int = 25,
+    val ishaMinutes: Int = 25,
     val jumuaMinutes: Int = 60
 ) {
     /** Whether the phone goes silent at this prayer ("Jumua" on Fridays). */
@@ -102,7 +102,7 @@ data class SilenceSettings(
         "Maghrib" -> maghribMinutes
         "Isha" -> ishaMinutes
         PrayerMath.JUMUA -> jumuaMinutes
-        else -> 15
+        else -> 25
     }.coerceIn(MIN_MINUTES, MAX_MINUTES)
 
     /** The same settings with one prayer's silence lasting [minutes]. */

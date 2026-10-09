@@ -2,6 +2,11 @@
 
 [← README](README.md) · [العربية](CHANGELOG.ar.md)
 
+## 0.3.2
+
+- Calls no longer ring during prayer silence, even when someone calls twice; they still arrive, silently.
+- Prayer silence now lasts 25 minutes by default instead of 15 (Fajr stays at 35 minutes, Jumua at an hour). Prayers whose length you set yourself keep it.
+
 ## 0.3.1
 
 - Without Do Not Disturb access, the whole Do Not Disturb card is locked, main switch included.

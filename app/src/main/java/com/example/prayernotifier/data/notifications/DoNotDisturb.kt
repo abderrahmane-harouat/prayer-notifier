@@ -31,9 +31,9 @@ interface Silencer {
  *
  * The rule is separate from the user's own Do Not Disturb: switching the
  * rule off never turns off Do Not Disturb the user turned on, and if the
- * user turns it off early, Android keeps it off. While it is on, alarms,
- * media and repeat callers (someone calling twice within 15 minutes) still
- * get through; calls, messages and other notifications wait.
+ * user turns it off early, Android keeps it off. While it is on, only alarms
+ * and media make sound; calls still arrive, silently, and messages and other
+ * notifications wait.
  */
 class DoNotDisturbSilencer(context: Context) : Silencer {
     private val app = context.applicationContext
@@ -45,7 +45,7 @@ class DoNotDisturbSilencer(context: Context) : Silencer {
     override fun start() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || !available()) return
         runCatching {
-            val id = ruleId() ?: addRule()
+            val id = ruleId()?.also(::upgradeRule) ?: addRule()
             manager.setAutomaticZenRuleState(id, condition(Condition.STATE_TRUE))
         }
     }
@@ -65,28 +65,42 @@ class DoNotDisturbSilencer(context: Context) : Silencer {
         manager.automaticZenRules.entries.firstOrNull { it.value.conditionId == CONDITION_ID }?.key
 
     @RequiresApi(Build.VERSION_CODES.Q)
-    private fun addRule(): String {
-        val policy = ZenPolicy.Builder()
-            .allowAlarms(true)
-            .allowMedia(true)
-            .allowRepeatCallers(true)
-            .allowCalls(ZenPolicy.PEOPLE_TYPE_NONE)
-            .allowMessages(ZenPolicy.PEOPLE_TYPE_NONE)
-            .allowEvents(false)
-            .allowReminders(false)
-            .allowSystem(false)
-            .build()
-        val rule = AutomaticZenRule(
-            ruleName(),
-            null,
-            ComponentName(app, MainActivity::class.java),
-            CONDITION_ID,
-            policy,
-            NotificationManager.INTERRUPTION_FILTER_PRIORITY,
-            true
-        )
-        return manager.addAutomaticZenRule(rule)
+    private fun addRule(): String = manager.addAutomaticZenRule(rule())
+
+    /**
+     * Rules made before 0.3.2 let repeat callers ring through the silence;
+     * give them the current [policy].
+     */
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun upgradeRule(id: String) {
+        val existing = manager.getAutomaticZenRule(id) ?: return
+        if (existing.zenPolicy?.priorityCategoryRepeatCallers != ZenPolicy.STATE_ALLOW) return
+        existing.zenPolicy = policy()
+        manager.updateAutomaticZenRule(id, existing)
     }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun rule() = AutomaticZenRule(
+        ruleName(),
+        null,
+        ComponentName(app, MainActivity::class.java),
+        CONDITION_ID,
+        policy(),
+        NotificationManager.INTERRUPTION_FILTER_PRIORITY,
+        true
+    )
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun policy(): ZenPolicy = ZenPolicy.Builder()
+        .allowAlarms(true)
+        .allowMedia(true)
+        .allowRepeatCallers(false)
+        .allowCalls(ZenPolicy.PEOPLE_TYPE_NONE)
+        .allowMessages(ZenPolicy.PEOPLE_TYPE_NONE)
+        .allowEvents(false)
+        .allowReminders(false)
+        .allowSystem(false)
+        .build()
 
     private fun condition(state: Int) = Condition(CONDITION_ID, ruleName(), state)
 

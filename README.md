@@ -1,6 +1,6 @@
 # Prayer Notifier
 
-**English** · [العربية](README.ar.md) · Version 0.3.1 · [Changelog](CHANGELOG.md)
+**English** · [العربية](README.ar.md) · Version 0.3.2 · [Changelog](CHANGELOG.md)
 
 A privacy-first prayer times app for Android. Prayer times are calculated on your phone from the sun's position, so it works offline for any date, and the app has no internet permission at all. A reminder before each prayer, Do Not Disturb during prayer, and Jumua on Fridays, in Arabic and English. No ads, no analytics, no tracking.
 
@@ -18,7 +18,7 @@ Google is still involved in finding and naming your location for now; [Privacy](
 
 - **Calculated on your phone**: any date, no internet, nothing to download. The method and the Asr time follow your country's official authority, or the one your mosque uses.
 - **A reminder before each prayer**: a quiet notification, on time or 5 to 30 minutes before, for all prayers at once or each one.
-- **Do Not Disturb at prayer time**: on at each adhan, off by itself after 35 minutes for Fajr, an hour for Jumua and 15 minutes for the others, or the length you choose.
+- **Do Not Disturb at prayer time**: on at each adhan, off by itself after 35 minutes for Fajr, an hour for Jumua and 25 minutes for the others, or the length you choose.
 - **Jumua on Fridays**: its own reminder (30 minutes before by default) and its own silence.
 - **Time corrections**: move a prayer up to 30 minutes either way to match your mosque, seeing today's time change as you do, and the Hijri date up to 2 days.
 - **Countdown and calendar**: the next prayer, Hijri and Gregorian dates, any day you pick, saved places.
