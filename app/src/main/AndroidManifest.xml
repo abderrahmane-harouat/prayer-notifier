@@ -39,6 +39,11 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- Alarms are absolute moments: a new clock time, time zone or
+                     app version re-plans them, instead of waiting for the night. -->
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="com.example.prayernotifier.ACTION_PRAYER_ALARM" />
                 <action android:name="com.example.prayernotifier.ACTION_REPLENISH" />
                 <action android:name="com.example.prayernotifier.ACTION_SILENCE_START" />

@@ -97,6 +97,25 @@ class PrayerAlarmHandlerTest {
         assertEquals(expected(CalculationMethod.EGYPT), scheduler.calls.last().second)
     }
 
+    @Test fun `plans in the place's zone when the phone is in another one`() = runTest {
+        storage.saveCurrentLocation(mecca)
+        // 23:30 in London is already 01:30 the next day in Mecca.
+        val phone = LocalDate.of(2026, 10, 24).atTime(23, 30).atZone(ZoneId.of("Europe/London"))
+        val handler = PrayerAlarmHandler(
+            LocationService(FakePositions(), FakeGeocode(), storage, FakeRegion()),
+            PrayerTimesRepository(deviceCountry = { null }),
+            settingsStore, scheduler, notifier, silencer, silenceState,
+            now = { phone }
+        )
+
+        assertTrue(handler.onDayChanged())
+
+        // Mecca's yesterday and today, not the phone's.
+        assertEquals(listOf(LocalDate.of(2026, 10, 24), LocalDate.of(2026, 10, 25)), scheduler.calls.map { it.first })
+        assertEquals(ZoneId.of("Asia/Riyadh"), scheduler.lastNow?.zone)
+        assertEquals(phone.toInstant(), scheduler.lastNow?.toInstant())
+    }
+
     @Test fun `day change without saved place plans nothing`() = runTest {
         assertFalse(handler.onDayChanged())
         assertEquals(0, scheduler.plans)
@@ -196,6 +215,7 @@ class PrayerAlarmHandlerTest {
         val calls = mutableListOf<Triple<LocalDate, PrayerTimings, AppSettings>>()
 
         var plans = 0
+        var lastNow: ZonedDateTime? = null
 
         override fun scheduleDays(
             days: List<com.example.prayernotifier.data.PrayerDay>,
@@ -203,6 +223,7 @@ class PrayerAlarmHandlerTest {
             now: ZonedDateTime
         ): ScheduleReport {
             plans++
+            lastNow = now
             days.forEach { calls += Triple(it.date, it.timings, settings) }
             return ScheduleReport(5, 0, false)
         }

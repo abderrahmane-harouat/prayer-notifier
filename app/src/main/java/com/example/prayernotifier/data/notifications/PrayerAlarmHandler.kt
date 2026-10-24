@@ -4,6 +4,8 @@ import com.example.prayernotifier.data.PrayerTimesRepository
 import com.example.prayernotifier.data.location.LocationService
 import com.example.prayernotifier.data.persistence.SettingsStore
 import java.time.ZonedDateTime
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Notification wording, so the handler stays free of Android resources. */
 /**
@@ -84,17 +86,22 @@ class PrayerAlarmHandler(
      * today's. A day that can't be calculated (polar summer) plans nothing
      * but still sets the next re-plan, so reminders resume by themselves.
      * Returns false when there is no place to plan for.
+     *
+     * The place's times are in its own zone, so "now" and "today" are read
+     * there too, whatever zone the phone is in. One plan at a time in the
+     * whole process: the screens and the receiver re-plan independently,
+     * and two plans mixing their cancels and sets would leave stale alarms.
      */
-    suspend fun onDayChanged(): Boolean {
+    suspend fun onDayChanged(): Boolean = PLANNING.withLock {
         resumeSilence()
-        val moment = now()
-        val current = location.getCurrentSavedLocation() ?: return false
+        val current = location.getCurrentSavedLocation() ?: return@withLock false
+        val moment = now().withZoneSameInstant(prayerTimes.zoneOf(current))
         val saved = settings.load()
         val days = listOf(moment.toLocalDate().minusDays(1), moment.toLocalDate()).mapNotNull { date ->
             runCatching { prayerTimes.day(date, current, saved) }.getOrNull()
         }
         scheduler.scheduleDays(days, saved, moment)
-        return days.isNotEmpty()
+        days.isNotEmpty()
     }
 
     /** After a reboot alarms are gone: end an overdue silence, or keep one going until its end. */
@@ -109,4 +116,8 @@ class PrayerAlarmHandler(
     }
 
     private fun nowMillis(): Long = now().toInstant().toEpochMilli()
+
+    private companion object {
+        val PLANNING = Mutex()
+    }
 }

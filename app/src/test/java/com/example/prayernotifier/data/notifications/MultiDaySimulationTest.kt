@@ -104,6 +104,9 @@ class MultiDaySimulationTest {
     @Test fun `random reboots and re-plans in Oslo, three years`() =
         simulate(oslo, LocalDate.of(2026, 10, 8), days = 1096, disruptions = Random(11))
 
+    @Test fun `Algiers with the phone in New York's time zone, a traveller who hasn't updated the place, one year`() =
+        simulate(algiers, LocalDate.of(2026, 10, 8), days = 366, phoneZone = "America/New_York", disruptions = Random(13))
+
     // region Simulation
 
     private data class Event(val at: ZonedDateTime, val what: String)
@@ -113,7 +116,9 @@ class MultiDaySimulationTest {
         start: LocalDate,
         days: Int,
         settings: AppSettings = AppSettings(),
-        disruptions: Random? = null
+        disruptions: Random? = null,
+        /** The phone's own time zone; the place's times must not depend on it. */
+        phoneZone: String = place.zone
     ) = runBlocking {
         val zone = ZoneId.of(place.zone)
         val location = CurrentLocation(place.name, place.latitude, place.longitude, place.country, place.zone)
@@ -132,7 +137,7 @@ class MultiDaySimulationTest {
             RecordingNotifier(clock, log),
             silencer,
             SilenceState(InMemoryKeyValueStore()),
-            now = { clock.now }
+            now = { clock.now.withZoneSameInstant(ZoneId.of(phoneZone)) }
         )
 
         // The phone starts: the boot alarm plans the first day.

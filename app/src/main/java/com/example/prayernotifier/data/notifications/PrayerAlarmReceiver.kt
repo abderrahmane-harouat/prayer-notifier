@@ -8,7 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-/** Receives exact-alarm fires, Do Not Disturb starts and ends, the daily re-plan alarm, and reboots. */
+/**
+ * Receives exact-alarm fires, Do Not Disturb starts and ends, the daily
+ * re-plan alarm, reboots, clock and time zone changes, and app updates.
+ */
 class PrayerAlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -36,7 +39,10 @@ internal suspend fun handleAlarm(handler: PrayerAlarmHandler, intent: Intent) {
             intent.silenceUntil()?.let { handler.startSilence(it) }
         ExactAlarmScheduler.ACTION_SILENCE_END -> handler.endSilence()
         ExactAlarmScheduler.ACTION_REPLENISH,
-        Intent.ACTION_BOOT_COMPLETED -> handler.onDayChanged()
+        Intent.ACTION_BOOT_COMPLETED,
+        Intent.ACTION_TIME_CHANGED,
+        Intent.ACTION_TIMEZONE_CHANGED,
+        Intent.ACTION_MY_PACKAGE_REPLACED -> handler.onDayChanged()
     }
 }
 

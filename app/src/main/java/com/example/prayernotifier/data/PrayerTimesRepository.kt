@@ -49,6 +49,7 @@ class PrayerTimesRepository(
 
     private fun countryOf(place: CurrentLocation): String? = place.countryCode ?: deviceCountry()
 
-    private fun zoneOf(place: CurrentLocation): ZoneId =
+    /** The zone the place's times are in: "now" and "today" there are read in it too. */
+    fun zoneOf(place: CurrentLocation): ZoneId =
         place.timeZone?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: deviceZone()
 }

@@ -11,12 +11,15 @@ import com.example.prayernotifier.data.persistence.AppSettings
 import com.example.prayernotifier.data.persistence.PrayerNotificationSettings
 import com.example.prayernotifier.data.persistence.PrayerTimeAdjustments
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 data class SettingsUiState(
@@ -52,6 +55,9 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
+    /** Loads, saves and recalculations run one at a time, in the order asked. */
+    private val work = Mutex()
+
     init {
         refresh()
     }
@@ -59,23 +65,28 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
     /** Re-read saved settings; called whenever the Settings page is shown. */
     fun refresh() {
         viewModelScope.launch {
-            val settings = withContext(Dispatchers.IO) { graph.settingsStore.load() }
-            showPlaceTimes(settings)
+            work.withLock {
+                val settings = withContext(Dispatchers.IO) { graph.settingsStore.load() }
+                _state.update { it.copy(settings = settings) }
+                showPlaceTimes()
+            }
             _state.update { it.copy(loading = false) }
         }
     }
 
-    /** What "automatic" means at the current place, and today's times there. */
-    private suspend fun showPlaceTimes(settings: AppSettings) {
+    /** What "automatic" means at the current place, and today's times there, for the settings on screen. */
+    private suspend fun showPlaceTimes() {
+        val settings = _state.value.settings
         val place = withContext(Dispatchers.IO) { graph.locationService.getCurrentSavedLocation() }
         val today = place?.let {
             withContext(Dispatchers.Default) {
-                runCatching { graph.prayerTimes.day(LocalDate.now(), it, settings).timings }.getOrNull()
+                runCatching {
+                    graph.prayerTimes.day(LocalDate.now(graph.prayerTimes.zoneOf(it)), it, settings).timings
+                }.getOrNull()
             }
         }
         _state.update {
             it.copy(
-                settings = settings,
                 automaticMethod = place?.let(graph.prayerTimes::automaticMethodFor)
                     ?: CalculationMethod.MUSLIM_WORLD_LEAGUE,
                 automaticAsr = place?.let(graph.prayerTimes::automaticAsrFor) ?: AsrMethod.STANDARD,
@@ -88,55 +99,67 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
         _state.update { it.copy(notificationsAllowed = notificationsAllowed, dndAllowed = graph.silencer.available()) }
     }
 
-    private fun persist(next: AppSettings) {
+    /**
+     * Shows a change at once, then saves it. Each change applies to the
+     * latest settings, not to a copy taken before an earlier change was
+     * saved, so quick taps in a row all stick. Saves run one at a time and
+     * each writes the settings on screen, right away, so Home reads them
+     * even when the page is closed at once.
+     */
+    private fun persist(change: (AppSettings) -> AppSettings, afterSave: suspend () -> Unit = {}) {
+        _state.update { it.copy(settings = change(it.settings)) }
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                graph.settingsStore.save(next)
+            work.withLock {
+                withContext(Dispatchers.IO) { graph.settingsStore.save(_state.value.settings) }
+                // The method or Asr rule may have changed today's times.
+                showPlaceTimes()
+            }
+            // Re-plans run one at a time on their own and read the latest
+            // saved settings, so the last one plans the last change. Never
+            // skipped, even when the app is closed right after a change.
+            withContext(NonCancellable + Dispatchers.IO) {
+                afterSave()
                 graph.rescheduleToday()
             }
-            // The method or Asr rule may have changed today's times.
-            showPlaceTimes(next)
         }
     }
 
     /** Null goes back to the method of the place's country. */
     fun setMethod(method: CalculationMethod?) {
-        persist(_state.value.settings.copy(calculationMethod = method?.name))
+        persist({ it.copy(calculationMethod = method?.name) })
     }
 
     /** Null goes back to the Asr rule of the place's country. */
     fun setAsr(asr: AsrMethod?) {
-        persist(_state.value.settings.copy(asrMethod = asr?.name))
+        persist({ it.copy(asrMethod = asr?.name) })
     }
 
     /** Off ends a silence that is on now and removes the app's rule from Android. */
     fun setSilenceEnabled(on: Boolean) {
-        val settings = _state.value.settings
-        persist(settings.copy(silence = settings.silence.copy(enabled = on)))
-        if (!on) viewModelScope.launch { withContext(Dispatchers.IO) { graph.turnOffSilence() } }
+        persist(
+            { it.copy(silence = it.silence.copy(enabled = on)) },
+            afterSave = { if (!on) graph.turnOffSilence() }
+        )
     }
 
     fun setSilenceMinutes(prayer: String, minutes: Int) {
-        val settings = _state.value.settings
-        persist(settings.copy(silence = settings.silence.withMinutes(prayer, minutes)))
+        persist({ it.copy(silence = it.silence.withMinutes(prayer, minutes)) })
     }
 
     fun setSilenceFor(prayer: String, on: Boolean) {
-        val settings = _state.value.settings
-        persist(settings.copy(silence = settings.silence.with(prayer, on)))
+        persist({ it.copy(silence = it.silence.with(prayer, on)) })
     }
 
     fun setPrayerNotifications(prayer: String, next: PrayerNotificationSettings) {
-        persist(_state.value.settings.withPrayerSettings(prayer, next))
+        persist({ it.withPrayerSettings(prayer, next) })
     }
 
     fun setHijriOffset(days: Int) {
-        persist(_state.value.settings.copy(hijriDateAdjustment = days.coerceIn(-2, 2)))
+        persist({ it.copy(hijriDateAdjustment = days.coerceIn(-2, 2)) })
     }
 
     fun setAdjustment(prayer: String, minutes: Int) {
-        val settings = _state.value.settings
-        persist(settings.copy(timeAdjustments = settings.timeAdjustments.with(prayer, minutes)))
+        persist({ it.copy(timeAdjustments = it.timeAdjustments.with(prayer, minutes)) })
     }
 
     fun adjustmentOf(prayer: String): Int =
@@ -145,22 +168,21 @@ class SettingsViewModel(private val graph: UiGraph) : ViewModel() {
 
     /** Same "remind me X min before" for every prayer; on/off stays per prayer. */
     fun setReminderForAll(minutes: Int) {
-        var next = _state.value.settings
-        PrayerMath.ORDER.forEach { prayer ->
-            next = next.withPrayerSettings(
-                prayer, next.getSettingsForPrayer(prayer).copy(prePrayerReminderMinutes = minutes)
-            )
-        }
-        persist(next)
+        persist({ settings ->
+            PrayerMath.ORDER.fold(settings) { next, prayer ->
+                next.withPrayerSettings(
+                    prayer, next.getSettingsForPrayer(prayer).copy(prePrayerReminderMinutes = minutes)
+                )
+            }
+        })
     }
 
     /** One save for a prayer's sheet: its reminder and its time correction. */
     fun savePrayer(prayer: String, notifications: PrayerNotificationSettings, adjustment: Int) {
-        val current = _state.value.settings
-        persist(
-            current.withPrayerSettings(prayer, notifications)
-                .copy(timeAdjustments = current.timeAdjustments.with(prayer, adjustment))
-        )
+        persist({
+            it.withPrayerSettings(prayer, notifications)
+                .copy(timeAdjustments = it.timeAdjustments.with(prayer, adjustment))
+        })
     }
 
     fun prayerNames(): List<String> = PrayerMath.ORDER

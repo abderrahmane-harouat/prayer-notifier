@@ -129,6 +129,13 @@ class PrayerMathTest {
         assertEquals(Duration.ofHours(8).plusMinutes(12), result.remaining)
     }
 
+    @Test fun `after isha counts to tomorrow's own fajr time`() {
+        val tomorrow = timings.copy(fajr = "05:14")
+        val result = PrayerMath.countdown(timings, none, now(21, 0), tomorrow)
+        assertEquals("Fajr", result.nextPrayer)
+        assertEquals(Duration.ofHours(8).plusMinutes(14), result.remaining)
+    }
+
     @Test fun `just before midnight rolls to next day`() {
         val result = PrayerMath.countdown(timings, none, now(23, 59))
         assertEquals("Fajr", result.nextPrayer)

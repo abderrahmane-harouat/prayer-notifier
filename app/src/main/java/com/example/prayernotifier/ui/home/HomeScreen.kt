@@ -61,9 +61,12 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -94,6 +97,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.prayernotifier.R
 import com.example.prayernotifier.data.LocalUiGraph
@@ -126,9 +130,9 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.Priority
 import java.time.Instant
-import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle as JavaTextStyle
 import java.util.Locale
@@ -330,7 +334,11 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
         if (answer == SnackbarResult.ActionPerformed) openDndAccessSettings(context)
     }
 
-    val today = LocalDate.now()
+    // The place's clock: its date is "today", and when it moves on (midnight,
+    // or the app shown again the next morning) Home follows it.
+    val clock = rememberPlaceClock(state.zone)
+    val today by remember { derivedStateOf { clock.value.toLocalDate() } }
+    LaunchedEffect(today) { vm.onToday(today) }
     val isToday = state.selectedDate == today
     val day = state.days.firstOrNull { it.date == state.selectedDate }
 
@@ -348,6 +356,7 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
             day == null -> LoadingState()
             else -> HomeContent(
                 vm = vm,
+                clock = clock,
                 isToday = isToday,
                 onToday = { vm.goToToday() },
                 onPickDate = { showDatePicker = true },
@@ -369,9 +378,11 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
     }
 
     if (showDatePicker) {
+        // The picker counts days in UTC: a local midnight would select the
+        // day before east of Greenwich, and pick the day before west of it.
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = state.selectedDate
-                .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
             // Times are calculated, so any year works; the Hijri calendar
             // covers about 1882 to 2174.
             yearRange = 1900..2100
@@ -382,7 +393,7 @@ fun HomeScreen(visible: Boolean, onOpenSettings: () -> Unit) {
                 TextButton(onClick = {
                     pickerState.selectedDateMillis?.let {
                         vm.selectDate(
-                            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                            Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
                         )
                     }
                     showDatePicker = false
@@ -505,9 +516,28 @@ private fun HomeErrorState(
     }
 }
 
+/**
+ * The wall clock at the place, read on every second while Home is on
+ * screen; paused in the background, and read again at once on return.
+ */
+@Composable
+private fun rememberPlaceClock(zone: ZoneId): State<LocalDateTime> {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    return produceState(LocalDateTime.now(zone), zone, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                value = LocalDateTime.now(zone)
+                // Wake just after the next second starts, so none is skipped.
+                delay(1000L - value.nano / 1_000_000)
+            }
+        }
+    }
+}
+
 @Composable
 private fun HomeContent(
     vm: HomeViewModel,
+    clock: State<LocalDateTime>,
     isToday: Boolean,
     onToday: () -> Unit,
     onPickDate: () -> Unit,
@@ -517,16 +547,14 @@ private fun HomeContent(
     val day = state.days.firstOrNull { it.date == state.selectedDate } ?: return
     val adjustments = state.settings.timeAdjustments
 
-    // 1s ticker for the countdown — recomputes from PrayerMath each tick.
-    var now by remember { mutableStateOf(LocalDateTime.now()) }
-    LaunchedEffect(isToday, day) {
-        while (true) {
-            now = LocalDateTime.now()
-            delay(1000)
-        }
+    // Recomputed from PrayerMath on each tick of the place's clock.
+    val now = clock.value
+    val tomorrow = state.days.firstOrNull { it.date == state.selectedDate.plusDays(1) }?.timings
+    val countdown = if (isToday) {
+        PrayerMath.countdown(day.timings, adjustments, now, tomorrow ?: day.timings)
+    } else {
+        null
     }
-
-    val countdown = if (isToday) PrayerMath.countdown(day.timings, adjustments, now) else null
     // Null after Isha: every prayer of the day is past.
     val nextToday = if (isToday) PrayerMath.nextPrayer(day.timings, adjustments, now) else null
     val heroPrayer = countdown?.nextPrayer ?: "Isha"

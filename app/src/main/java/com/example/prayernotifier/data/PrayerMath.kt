@@ -89,19 +89,21 @@ object PrayerMath {
 
     /**
      * Time left until the next prayer. After Isha the answer is tomorrow's
-     * Fajr — the countdown never shows zero/empty.
+     * Fajr — the countdown never shows zero/empty. [tomorrow] holds that
+     * Fajr's own time; without it today's stands in, a minute or two off.
      */
     fun countdown(
         timings: PrayerTimings,
         adjustments: PrayerTimeAdjustments,
-        now: LocalDateTime
+        now: LocalDateTime,
+        tomorrow: PrayerTimings = timings
     ): Countdown {
         val next = nextPrayer(timings, adjustments, now)
         if (next != null) {
             val at = dateTimeFor(timings, adjustments, next, now.toLocalDate())
             return Countdown(next, Duration.between(now, at))
         }
-        val tomorrowFajr = dateTimeFor(timings, adjustments, "Fajr", now.toLocalDate().plusDays(1))
+        val tomorrowFajr = dateTimeFor(tomorrow, adjustments, "Fajr", now.toLocalDate().plusDays(1))
         return Countdown("Fajr", Duration.between(now, tomorrowFajr))
     }
 }

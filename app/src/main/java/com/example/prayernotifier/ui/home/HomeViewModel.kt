@@ -10,7 +10,12 @@ import com.example.prayernotifier.data.location.SavedLocation
 import com.example.prayernotifier.data.persistence.AppSettings
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +55,8 @@ data class HomeUiState(
     val locationName: String = "",
     val days: List<PrayerDay> = emptyList(),
     val selectedDate: LocalDate = LocalDate.now(),
+    /** The place's time zone: its times are in it, and so are "now" and "today". */
+    val zone: ZoneId = ZoneId.systemDefault(),
     val settings: AppSettings = AppSettings(),
     val error: HomeError? = null,
     val savedLocations: List<SavedLocation> = emptyList(),
@@ -65,28 +72,33 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
 
     private var current: CurrentLocation? = null
 
+    /** The place change in progress (start, a fix, a saved place); a newer one replaces it. */
+    private var placeJob: Job? = null
+
+    /** The month calculation in progress; a newer one replaces it. */
+    private var monthJob: Job? = null
+
+    /** Today at the place, as last seen by [onToday]. */
+    private var today: LocalDate = _state.value.selectedDate
+
     init {
         start()
     }
 
-    fun start() {
-        viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = null) }
-            val settings = withContext(Dispatchers.IO) { graph.settingsStore.load() }
-            _state.update { it.copy(settings = settings) }
-            val cached = withContext(Dispatchers.IO) {
-                graph.locationService.getCurrentSavedLocation()
-            }
-            if (cached != null) {
-                current = cached
-                _state.update { it.copy(locationName = cached.name) }
-                loadMonth(itSelected())
-                // Saved by a version that didn't record the place's time zone
-                // and country: a fresh fix records both.
-                if (cached.timeZone == null) obtainFreshLocation()
-            } else {
-                obtainFreshLocation()
-            }
+    fun start() = changePlace {
+        _state.update { it.copy(loading = true, error = null) }
+        val settings = withContext(Dispatchers.IO) { graph.settingsStore.load() }
+        _state.update { it.copy(settings = settings) }
+        val cached = withContext(Dispatchers.IO) {
+            graph.locationService.getCurrentSavedLocation()
+        }
+        if (cached != null) {
+            show(cached)
+            // Saved by a version that didn't record the place's time zone
+            // and country: a fresh fix records both.
+            if (cached.timeZone == null) obtainFreshLocation()
+        } else {
+            obtainFreshLocation()
         }
     }
 
@@ -96,7 +108,7 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
     fun onPermissionResult(granted: Boolean, locked: Boolean) {
         _state.update { it.copy(askForPermission = false) }
         if (granted) {
-            viewModelScope.launch { obtainFreshLocation() }
+            changePlace { obtainFreshLocation() }
         } else {
             val cause = if (locked) {
                 LocationCause.PermissionLocked
@@ -129,40 +141,41 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
         if (locationPermissionGranted &&
             _state.value.error is HomeError.LocationRequired
         ) {
-            viewModelScope.launch { obtainFreshLocation() }
+            changePlace { obtainFreshLocation() }
         }
     }
 
-    fun refreshLocation() {
-        viewModelScope.launch { obtainFreshLocation() }
-    }
+    fun refreshLocation() = changePlace { obtainFreshLocation() }
 
     fun selectDate(date: LocalDate) {
         val before = _state.value.selectedDate
         if (before == date) return
         _state.update { it.copy(selectedDate = date, error = null) }
-        if (before.year != date.year || before.monthValue != date.monthValue) {
-            viewModelScope.launch { loadMonth(date) }
-        }
+        if (YearMonth.from(before) != YearMonth.from(date)) reloadMonth()
     }
 
     /** Instant when today's month is already loaded (the usual case). */
-    fun goToToday() = selectDate(LocalDate.now())
+    fun goToToday() = selectDate(LocalDate.now(_state.value.zone))
+
+    /**
+     * The place's date, as the clock on screen reads it. When it moves on
+     * (midnight, or the app shown again the next morning) while today was
+     * shown, the new today is shown.
+     */
+    fun onToday(date: LocalDate) {
+        val before = today
+        today = date
+        if (date != before && _state.value.selectedDate == before) selectDate(date)
+    }
 
     fun consumeNotice() = _state.update { it.copy(notice = null) }
 
-    fun selectSavedLocation(location: SavedLocation) {
-        viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = null) }
-            val updated = withContext(Dispatchers.IO) {
-                graph.locationService.selectSavedLocation(location)
-            }
-            current = updated
-            _state.update {
-                it.copy(locationName = updated.name, selectedDate = LocalDate.now())
-            }
-            loadMonth(LocalDate.now())
+    fun selectSavedLocation(location: SavedLocation) = changePlace {
+        _state.update { it.copy(error = null) }
+        val updated = withContext(Dispatchers.IO) {
+            graph.locationService.selectSavedLocation(location)
         }
+        show(updated, toToday = true)
     }
 
     fun loadSavedLocations() {
@@ -182,11 +195,44 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
             val methodChanged = settings.calculationMethod != before.calculationMethod ||
                 settings.asrMethod != before.asrMethod
             _state.update { it.copy(settings = settings) }
-            if (methodChanged && current != null) loadMonth(itSelected())
+            if (methodChanged && current != null) reloadMonth()
         }
     }
 
-    private fun itSelected(): LocalDate = _state.value.selectedDate
+    /**
+     * Runs a place change once the one in progress has stopped, so the
+     * last request wins: a slow fix can't land after a saved place the
+     * user picked meanwhile and replace it.
+     */
+    private fun changePlace(block: suspend () -> Unit) {
+        val previous = placeJob
+        placeJob = viewModelScope.launch {
+            previous?.cancelAndJoin()
+            block()
+        }
+    }
+
+    /**
+     * Puts [place] on screen and re-plans its reminders. The date shown
+     * moves to the place's today when today was shown (the new place's
+     * date can differ), or always with [toToday].
+     */
+    private suspend fun show(place: CurrentLocation, toToday: Boolean = false) {
+        current = place
+        val zone = graph.prayerTimes.zoneOf(place)
+        val placeToday = LocalDate.now(zone)
+        _state.update {
+            val date = if (toToday || it.selectedDate == today) placeToday else it.selectedDate
+            it.copy(locationName = place.name, zone = zone, selectedDate = date)
+        }
+        today = placeToday
+        reloadMonth()
+        loadSavedLocations()
+        // Never skipped, even when a newer place change cancels this one: the
+        // place is saved already, so its alarms must follow. A failure keeps
+        // the times on screen; the nightly re-plan tries again.
+        withContext(NonCancellable + Dispatchers.IO) { runCatching { graph.rescheduleToday() } }
+    }
 
     /**
      * Fresh GPS fix → name → load times. With prayer times already on screen
@@ -205,25 +251,23 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
                 it.copy(loading = false, locating = false, error = HomeError.LocationRequired(cause))
             }
         }
-        try {
-            val fresh = withContext(Dispatchers.IO) {
+        val fresh = try {
+            withContext(Dispatchers.IO) {
                 graph.locationService.refreshLocation()
             }
-            current = fresh
-            _state.update {
-                it.copy(
-                    locationName = fresh.name,
-                    locating = false,
-                    notice = if (hasData) HomeNotice.LocationUpdated(fresh.name) else it.notice
-                )
-            }
-            loadMonth(itSelected())
+        } catch (e: CancellationException) {
+            // Replaced by a newer place change, which sets its own state.
+            _state.update { it.copy(locating = false) }
+            throw e
         } catch (e: LocationException.PermissionDenied) {
             _state.update { it.copy(loading = false, locating = false, askForPermission = true) }
+            return
         } catch (e: LocationException.ServiceDisabled) {
             fail(LocationCause.ServiceDisabled)
+            return
         } catch (e: LocationException.NoFix) {
             fail(LocationCause.NoFix)
+            return
         } catch (e: Exception) {
             _state.update {
                 if (hasData) {
@@ -232,10 +276,23 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
                     it.copy(loading = false, locating = false, error = HomeError.LoadFailed(e.message.orEmpty()))
                 }
             }
+            return
         }
+        _state.update {
+            it.copy(
+                locating = false,
+                notice = if (hasData) HomeNotice.LocationUpdated(fresh.name) else it.notice
+            )
+        }
+        show(fresh)
     }
 
-    private suspend fun loadMonth(forDate: LocalDate) {
+    /**
+     * Calculates the shown month for the current place and settings. Only
+     * the latest request lands: an earlier month finishing late never
+     * replaces the one now shown.
+     */
+    private fun reloadMonth() {
         val loc = current
         if (loc == null) {
             _state.update {
@@ -246,22 +303,26 @@ class HomeViewModel(private val graph: UiGraph) : ViewModel() {
             }
             return
         }
+        val month = YearMonth.from(_state.value.selectedDate)
+        val settings = _state.value.settings
+        monthJob?.cancel()
         _state.update { it.copy(loading = true, error = null) }
-        try {
-            val days = withContext(Dispatchers.Default) {
-                graph.prayerTimes.month(YearMonth.from(forDate), loc, _state.value.settings)
-            }
-            _state.update { it.copy(loading = false, days = days) }
-            if (forDate == LocalDate.now()) {
-                withContext(Dispatchers.IO) { graph.rescheduleToday() }
-            }
-        } catch (e: Exception) {
-            _state.update {
-                it.copy(
-                    loading = false,
-                    error = HomeError.LoadFailed(e.message.orEmpty()),
-                    notice = if (it.days.isNotEmpty()) HomeNotice.LoadFailed else it.notice
-                )
+        monthJob = viewModelScope.launch {
+            try {
+                val days = withContext(Dispatchers.Default) {
+                    graph.prayerTimes.month(month, loc, settings)
+                }
+                _state.update { it.copy(loading = false, days = days) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        error = HomeError.LoadFailed(e.message.orEmpty()),
+                        notice = if (it.days.isNotEmpty()) HomeNotice.LoadFailed else it.notice
+                    )
+                }
             }
         }
     }
