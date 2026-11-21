@@ -2,6 +2,16 @@
 
 [← README](README.md) · [العربية](CHANGELOG.ar.md)
 
+## 0.3.4
+
+- Home moves to the new day at midnight and when you come back to the app, unless you picked another date.
+- The countdown, the next prayer and the reminders follow the place's time zone, even when the phone is set to another one.
+- Quick changes in Settings all stick.
+- When you change place, the latest place always wins, and reminders are planned again for it.
+- Reminders are planned again after a clock, time zone or app update.
+- After Isha the countdown runs to tomorrow's Fajr.
+- The date picker no longer picks the day before.
+
 ## 0.3.3
 
 - Prayer silence is now total: no ringing, notification sounds, alarms, media or vibration. Calls and notifications still arrive, silently.
